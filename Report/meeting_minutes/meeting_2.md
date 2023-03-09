@@ -24,4 +24,8 @@ People who attended:
 - Start Writing Feasibility Report, pick a direction for task scheduling problem
 - Can use mock task data for sheduling
 
-## Feedback
+## Further Discussion on Next Meeting
+
+1. Need to know the task scheduling polices in Cirrus, a more comprehensive evaluation and comparison is required.
+2. Cirrus batch system has issue in my previous RL project while running.
+3. GNN was originally proposed to solve this task as the policy network architecture, however, it is too complex to use, can I use a different network on it. Such as GAN.
