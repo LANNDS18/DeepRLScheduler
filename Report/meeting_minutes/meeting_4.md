@@ -3,7 +3,7 @@
 ## Meeting Information
 
 **Meeting Date/Time:**
-13:30, 10/03/23 / 30min
+13:30, 17/03/23 / 30min
 
 **Meeting Purpose:**
 Discuess the Resource Application and Further Questions regarding HPC scheduling
@@ -19,10 +19,10 @@ People who attended:
 
 ## Discussed Items
 
-1. Email the Dissertation team for requesting resources, and justification.
-2. Trying different training strategies, don’t be afraid of bad results in the evaluation.
-3. timeline ASAP, by Wednesday
-4. Send an Email about my Question
-5. GPU time estimation
+1. Query Request via Safe to retrieve more information regarding to Cirrus
+2. Analyze milestone and risk evaluation.
+3. Have a plan with a time duration choice?
+4. The dataset is not sure but maybe can be used.
+5. GPU: send email to dissertation team for testing the feasibility
 
 ## Further Discussion on Next Meeting

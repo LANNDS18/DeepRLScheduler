@@ -12,7 +12,7 @@ There are 3 main milestones in the project plan. The first milestone is the deve
 
 
 | Type      | Title                                                                | Start date | End date   | Duration (in days) |
-| --------- | -------------------------------------------------------------------- | ---------- | ---------- | ------------------ |
+|-----------|----------------------------------------------------------------------|------------|------------|--------------------|
 | Task      | Gym HPC Scheduler Environment                                        | 05/27/2023 | 06/09/2023 | 14                 |
 | Task      | Trajectories Data Collection and Cleaning                            | 05/27/2023 | 06/04/2023 | 9                  |
 | Task      | Injected Trajectories to Gym Env                                     | 06/05/2023 | 06/14/2023 | 10                 |
