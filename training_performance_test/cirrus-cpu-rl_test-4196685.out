@@ -1,0 +1,6 @@
+device:cpu
+Evaluation at timestep 2000 returned a mean returns of -1013.7791748046875
+Evaluation at timestep 4000 returned a mean returns of -646.1573486328125
+Evaluation at timestep 6000 returned a mean returns of -289.9147644042969
+Reached return -289.9147644042969 >= target return of -300.0
+Saving to:  pendulum_latest.pt

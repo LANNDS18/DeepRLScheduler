@@ -1,0 +1,25 @@
+device:cuda
+Evaluation at timestep 2000 returned a mean returns of -1193.4034423828125
+Evaluation at timestep 4000 returned a mean returns of -1237.8973388671875
+Evaluation at timestep 6000 returned a mean returns of -1119.9942626953125
+Evaluation at timestep 8000 returned a mean returns of -1225.6029052734375
+Evaluation at timestep 10000 returned a mean returns of -1170.621337890625
+Evaluation at timestep 12000 returned a mean returns of -1327.0670166015625
+Evaluation at timestep 14000 returned a mean returns of -1047.0716552734375
+Evaluation at timestep 16000 returned a mean returns of -1004.778564453125
+Evaluation at timestep 18000 returned a mean returns of -947.66845703125
+Evaluation at timestep 20000 returned a mean returns of -1032.584228515625
+Evaluation at timestep 22000 returned a mean returns of -1038.835205078125
+Evaluation at timestep 24000 returned a mean returns of -903.135986328125
+Evaluation at timestep 26000 returned a mean returns of -892.3148193359375
+Evaluation at timestep 28000 returned a mean returns of -1038.402587890625
+Evaluation at timestep 30000 returned a mean returns of -977.4166259765625
+Evaluation at timestep 32000 returned a mean returns of -1024.790771484375
+Evaluation at timestep 34000 returned a mean returns of -894.638916015625
+Evaluation at timestep 36000 returned a mean returns of -831.7166748046875
+Evaluation at timestep 38000 returned a mean returns of -890.010009765625
+Evaluation at timestep 40000 returned a mean returns of -1145.4205322265625
+Evaluation at timestep 42000 returned a mean returns of -1009.4739990234375
+Evaluation at timestep 44000 returned a mean returns of -285.84375
+Reached return -285.84375 >= target return of -300.0
+Saving to:  pendulum_latest.pt
