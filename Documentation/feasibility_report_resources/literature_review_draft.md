@@ -76,3 +76,9 @@ Network: takes the waiting jobs and their features as input, outputs a probabili
 Order Issue: The RL agent should focus less on the original job order, and more on the job's attributes. A new kernel-based DNN architecture to be insensitive to job orders.
 
 High Variance in Sample issue: First, one ‘bad‘ trajectory will diminish what RL agent has learned as we have discussed. Second, too many ‘good’ trajectories will barely teach RL agent anything during training, because no matter what scheduling policy it currently holds, the slowdown is gonna be 1.
+
+
+
+## Deep Reinforcement Agent for Scheduling in HPC
+
+DRAS is built on a novel, hierarchical neural network incorporating special HPC scheduling features such as resource reservation and backfilling. A unique training strategy is presented to enable DRAS to rapidly learn the target environment. Once being provided a specific scheduling objective given by system manager, DRAS automatically learns to improve its policy through interaction with the scheduling environment and dynamically adjusts its policy as workload changes. The experiments with different production workloads demonstrate that DRAS outperforms the existing heuristic and optimization approaches by up to 45%. ?
