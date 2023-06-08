@@ -9,7 +9,6 @@ from deepRL_scheduler.sched_env.scheduler import NullScheduler
 from deepRL_scheduler.sched_env.gym_env.workload import SyntheticWorkloadGenerator
 
 
-
 class SimulationType(IntEnum):
     EVENT_BASED = (0,)
     TIME_BASED = 1
@@ -30,11 +29,11 @@ class DeepRmSimulator:
     workload: SyntheticWorkloadGenerator
 
     def __init__(
-        self,
-        workload_generator: SyntheticWorkloadGenerator,
-        scheduler: NullScheduler,
-        simulation_type: SimulationType = SimulationType.TIME_BASED,
-        job_slots: Optional[int] = None,
+            self,
+            workload_generator: SyntheticWorkloadGenerator,
+            scheduler: NullScheduler,
+            simulation_type: SimulationType = SimulationType.TIME_BASED,
+            job_slots: Optional[int] = None,
     ):
 
         self.scheduler = scheduler
@@ -45,9 +44,9 @@ class DeepRmSimulator:
         self.reset(self.workload, scheduler)
 
     def rl_step(
-        self,
-        action: Optional[int],
-        listjobs: Optional[Callable[[], List[Job]]],
+            self,
+            action: Optional[int],
+            listjobs: Optional[Callable[[], List[Job]]],
     ) -> List[List[Job]]:
         return self.simulator.rl_step(
             action if action is not None else -1,
@@ -92,13 +91,13 @@ class EventBasedDeepRmSimulator:
     job_slots: slice
 
     def __init__(
-        self,
-        workload_generator: SyntheticWorkloadGenerator,
-        scheduler: NullScheduler,
-        job_slots: slice,
+            self,
+            workload_generator: SyntheticWorkloadGenerator,
+            scheduler: NullScheduler,
+            job_slots: slice,
     ):
         if (
-            not isinstance(workload_generator, SyntheticWorkloadGenerator)
+                not isinstance(workload_generator, SyntheticWorkloadGenerator)
         ) or not isinstance(scheduler, NullScheduler):
             raise AssertionError('Invalid arguments received.')
 
@@ -119,7 +118,7 @@ class EventBasedDeepRmSimulator:
             self.current_time = first_job_time
 
     def rl_step(
-        self, action: int, listjobs: Callable[[], List[Job]]
+            self, action: int, listjobs: Callable[[], List[Job]]
     ) -> List[List[Job]]:
         "Returns a list of jobs for each successful intermediate time step."
 
@@ -146,13 +145,13 @@ class TimeBasedDeepRmSimulator:
     job_slots: slice
 
     def __init__(
-        self,
-        workload_generator: SyntheticWorkloadGenerator,
-        scheduler: NullScheduler,
-        job_slots: slice,
+            self,
+            workload_generator: SyntheticWorkloadGenerator,
+            scheduler: NullScheduler,
+            job_slots: slice,
     ):
         if (
-            not isinstance(workload_generator, SyntheticWorkloadGenerator)
+                not isinstance(workload_generator, SyntheticWorkloadGenerator)
         ) or not isinstance(scheduler, NullScheduler):
             raise AssertionError('Invalid arguments received.')
 
@@ -175,7 +174,7 @@ class TimeBasedDeepRmSimulator:
         raise NotImplementedError('This simulator cannot follow the base API')
 
     def rl_step(
-        self, action: int, listjobs: Callable[[], List[Job]]
+            self, action: int, listjobs: Callable[[], List[Job]]
     ) -> List[List[Job]]:
         "Returns a list of jobs for each successful intermediate time step."
 

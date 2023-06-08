@@ -1,13 +1,14 @@
 """
-swf_parser - Parser for the Standard Workload Format (SWF)
+    swf_parser - Parser for the Standard Workload Format (SWF)
 
-A full description of the format, with meanings for each field is available on
-the web at http://www.cs.huji.ac.il/labs/parallel/workload/swf.html.
+    A full description of the format, with meanings for each field is available on
+    the web at http://www.cs.huji.ac.il/labs/parallel/workload/swf.html.
 """
 
-from enum import IntEnum
-
 import logging
+import sys
+
+from enum import IntEnum
 
 from deepRL_scheduler.sched_env.job import Job, SwfJobStatus
 
@@ -53,13 +54,18 @@ def parse(filename, processors, memory, ignore_memory=False):
     """
 
     with open(filename, 'r') as fp:  # pylint: disable=C
+        res = 0
         for line in fp:
+
             if ';' in line:
                 continue
             fields = line.strip().split()
             fields = [  # Converts all fields according to our rules
                 CONVERTERS[SwfFields(i)](f) for i, f in enumerate(fields)
             ]
+
+            if res == 0: print(fields[SwfFields.STATUS])
+            res += 1
 
             job = Job(
                 fields[SwfFields.JOB_ID],
@@ -91,13 +97,16 @@ def parse(filename, processors, memory, ignore_memory=False):
             if job.requested_memory < 0 and ignore_memory:
                 job.requested_memory = 0
 
-            if (
-                    job.requested_processors < 1
-                    or (job.requested_memory < 1 and not ignore_memory)
-                    or job.execution_time < 1
-                    or job.submission_time < 0
-            ):
-                logger.warning(f'Ignoring malformed job {job.id}')
+            if job.requested_memory < 1 and not ignore_memory:
+                logger.warning(f'Ignoring wrong memory indication job {job.id}')
+                continue
+
+            if job.requested_processors < 1:
+                logger.warning(f'Ignoring wrong processor indication job {job.id}')
+                continue
+
+            if job.execution_time < 0.1 or job.submission_time < 0:
+                logger.warning(f'Ignoring unclear execution time and/or submission time job {job.id}')
                 continue
 
             if job.requested_time < job.execution_time:
@@ -110,3 +119,41 @@ def parse(filename, processors, memory, ignore_memory=False):
                 job.requested_memory = memory
 
             yield job
+
+
+class SwfWorkload:
+    def __init__(self, path):
+        self.all_jobs = []
+        self.max = 0
+        self.max_exec_time = 0
+        self.min_exec_time = sys.maxsize
+        self.max_job_id = 0
+
+        self.max_requested_memory = 0
+        self.max_user_id = 0
+        self.max_group_id = 0
+        self.max_executable_number = 0
+        self.max_job_id = 0
+        self.max_nodes = 0
+        self.max_procs = 0
+        self.ignore_memory = True
+
+        with open(path) as fp:
+            for line in fp:
+                if line.startswith(";"):
+                    if line.startswith("; MaxNodes:"):
+                        self.max_nodes = int(line.split(":")[1].strip())
+                    if line.startswith("; MaxProcs:"):
+                        self.max_procs = int(line.split(":")[1].strip())
+                    if self.max_procs == 0:
+                        self.max_procs = self.max_nodes
+
+        self.all_jobs = list(parse(path, self.max_procs, self.max_procs, self.ignore_memory))
+        self.all_jobs.sort(key=lambda job: job.id)
+
+
+if __name__ == "__main__":
+    print("Loading the workloads...")
+    load = list(parse("../../dataset/NASA-iPSC-1993-3.1-cln.swf", 256, 256, True))
+    load.sort(key=lambda job: job.id)
+    print(load[0])
