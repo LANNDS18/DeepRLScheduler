@@ -151,6 +151,13 @@ class SwfWorkload:
         self.all_jobs = list(parse(path, self.max_procs, self.max_procs, self.ignore_memory))
         self.all_jobs.sort(key=lambda job: job.id)
 
+    def size(self):
+        return len(self.all_jobs)
+
+    def reset(self):
+        for job in self.all_jobs:
+            job.submission_time = -1
+
 
 if __name__ == "__main__":
     print("Loading the workloads...")
