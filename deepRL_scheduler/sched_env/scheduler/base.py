@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """scheduler - Module with basic scheduling functionality.
 
 This is the core of the simulator, since this module contains functionality
@@ -58,15 +61,9 @@ class Scheduler(ABC):
     ----------
         number_of_processors : int
             The number of processors in the system
-        total_memory : int
-            The amount of memory in the system
-        ignore_memory : bool
-            Whether memory should be ignored when making decisions, or not
     """
 
-    used_memory: int
     current_time: int
-    total_memory: int
     used_processors: int
     need_schedule_call: bool
     number_of_processors: int
@@ -79,10 +76,9 @@ class Scheduler(ABC):
     stats: Dict[int, Stats]
 
     def __init__(
-        self, number_of_processors, total_memory, ignore_memory=False
+        self, number_of_processors
     ):
         self.number_of_processors = number_of_processors
-        self.total_memory = total_memory
 
         self.queue_waiting = []
         self.queue_running = []
@@ -90,13 +86,11 @@ class Scheduler(ABC):
         self.queue_admission = []
 
         self.stats = {}
-        self.used_memory = 0
         self.current_time = 0
         self.used_processors = 0
-        self.ignore_memory = ignore_memory
         self.job_events = EventQueue(self.current_time - 1)
         self.cluster = Cluster(
-            number_of_processors, total_memory, ignore_memory
+            number_of_processors
         )
         self.need_schedule_call = False
         'Tracks whether we might need to schedule jobs'
@@ -160,7 +154,6 @@ class Scheduler(ABC):
         self.queue_running.append(j)
 
         j.status = JobStatus.RUNNING
-        self.used_memory += j.memory_use
         self.used_processors += j.processors_allocated
         j.wait_time = j.start_time - j.submission_time
 
@@ -177,7 +170,6 @@ class Scheduler(ABC):
 
         j.status = JobStatus.COMPLETED
         j.finish_time = j.start_time + j.execution_time
-        self.used_memory -= j.memory_use
         self.used_processors -= j.processors_allocated
 
     def _add_job_events(
@@ -192,6 +184,7 @@ class Scheduler(ABC):
             time : int
                 The time step to associate the start event with
         """
+        print(job.resources)
         if not job.resources or not job.proper:
             raise AssertionError(
                 'Malformed job submitted either with no processors, '
@@ -212,7 +205,7 @@ class Scheduler(ABC):
         """Returns the amount of free resources in the system."""
         return (
             self.number_of_processors - self.used_processors,
-            self.total_memory - self.used_memory,
+            0,
         )
 
     def step(self, offset: int = None) -> bool:
@@ -429,7 +422,7 @@ class Scheduler(ABC):
         The state representation used here is deeply inspired by the DeepRM
         state representation, meaning it will return three blocks of
         information:
-        * The current status of processors and memory used in the system
+        * The current status of processors used in the system
         * A select number of jobs in the admission queue
         * A "backlog" representing the presence or absence of jobs in the queue
         (for jobs that didn't make into the previous representation)
@@ -459,8 +452,7 @@ class Scheduler(ABC):
                 cluster = self.play_events(near_future[t], cluster)
             tmp.append(cluster.state)
         state = list(zip(*tmp))
-        if self.ignore_memory:
-            state = state[:1]
+        state = state[:1]
         # }}}
 
         # Gets the representation of jobs in `job_slots` {{{
@@ -502,9 +494,7 @@ class Scheduler(ABC):
                 The start time of the job
         """
         job.status = JobStatus.WAITING
-        job.resources.memory = resources.memory
         job.resources.processors = resources.processors
-        job.resources.ignore_memory = resources.ignore_memory
         job.start_time = time
         self.queue_waiting.append(job)
         return self._add_job_events(job, time)

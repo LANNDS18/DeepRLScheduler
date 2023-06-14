@@ -111,7 +111,6 @@ class Job:
             preceding_job_id=-1,
             think_time=-1,
             wait_time=-1,
-            ignore_memory=True,
     ):
         self.id: int = job_id
         self.submission_time: int = submission_time
@@ -136,7 +135,6 @@ class Job:
         self.first_scheduling_promise: int = -1
         self.start_time: int = -1
         self.finish_time: int = -1
-        self.ignore_memory = ignore_memory
         self.slot_position: int = -1
         self.free_processors = -1
         self.queued_work = -1
@@ -146,7 +144,6 @@ class Job:
         return (
             f'Job<{self.id}, {self.status.name}, start={self.start_time}, '
             f'processors={self.requested_processors}, '
-            f'memory={self.requested_memory} '
             f'duration={self.execution_time}>'
         )
 
@@ -165,10 +162,8 @@ class Job:
         Returns:
             bool: True if the job is proper, and False otherwise.
         """
-        processors, memory = self.resources.measure()
-        return processors == self.requested_processors and (
-                self.ignore_memory or memory == self.requested_memory
-        )
+        processors = self.resources.measure()
+        return processors == self.requested_processors
 
     @property
     def slowdown(self):

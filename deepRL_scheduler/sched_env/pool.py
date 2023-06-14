@@ -13,8 +13,7 @@ from intervaltree import IntervalTree, Interval
 class ResourceType(enum.IntEnum):
     """Enumeration to determine which kind of resource we're managing."""
 
-    CPU = 1
-    MEMORY = 0
+    CPU = 0
 
 
 class ResourcePool:

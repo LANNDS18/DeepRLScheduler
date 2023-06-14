@@ -23,7 +23,7 @@ from deepRL_scheduler.sched_env.scheduler.base import Scheduler
 
 
 class NullScheduler(Scheduler):
-    """A scheduler that receives scheduling commands from a client.
+    """An scheduler that receives scheduling commands from a client.
 
     This is a null scheduler in the sense that scheduling decisions aren't made
     by this class, but by another class, which forwards its decisions to this
@@ -35,18 +35,17 @@ class NullScheduler(Scheduler):
     ----------
         number_of_processors : int
             The number of processors managed by this scheduler
-        total_memory : int
-            The total amount of memory in the cluster managed by this scheduler
     """
 
     current_slot: Optional[int]
 
     def __init__(
-        self, number_of_processors, total_memory, ignore_memory=False
+        self, number_of_processors
     ):
+        number_of_processors = 1024
         self.current_slot: Optional[int] = None
         super().__init__(
-            number_of_processors, total_memory, ignore_memory=ignore_memory
+            number_of_processors
         )
 
     def step(self, offset: int = None) -> bool:

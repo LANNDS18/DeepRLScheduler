@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 
 from enum import IntEnum
-from typing import Callable, List, Optional, Union, cast
+from typing import Callable, List, Optional, cast
 
 from deepRL_scheduler.sched_env.job import Job
 from deepRL_scheduler.sched_env.scheduler import NullScheduler
-from deepRL_scheduler.sched_env.gym_env.workload import SyntheticWorkloadGenerator
+from deepRL_scheduler.sched_env.workload.swf_parser import SwfWorkload
 
 
 class SimulationType(IntEnum):
-    EVENT_BASED = (0,)
+    EVENT_BASED = 0
     TIME_BASED = 1
 
     @staticmethod
@@ -26,11 +26,11 @@ class SimulationType(IntEnum):
 
 class DeepRmSimulator:
     scheduler: NullScheduler
-    workload: SyntheticWorkloadGenerator
+    workload: SwfWorkload
 
     def __init__(
             self,
-            workload_generator: SyntheticWorkloadGenerator,
+            workload_generator: SwfWorkload,
             scheduler: NullScheduler,
             simulation_type: SimulationType = SimulationType.TIME_BASED,
             job_slots: Optional[int] = None,
@@ -54,13 +54,7 @@ class DeepRmSimulator:
         )
 
     def build(self):
-        if self.simulation_type == SimulationType.EVENT_BASED:
-            return EventBasedDeepRmSimulator(
-                self.workload,
-                self.scheduler,
-                self.job_slots,
-            )
-        elif self.simulation_type == SimulationType.TIME_BASED:
+        if self.simulation_type == SimulationType.TIME_BASED:
             return TimeBasedDeepRmSimulator(
                 self.workload,
                 self.scheduler,
@@ -85,60 +79,6 @@ class DeepRmSimulator:
         self.simulator = self.build()
 
 
-class EventBasedDeepRmSimulator:
-    last_job_time: int
-    scheduler: NullScheduler
-    job_slots: slice
-
-    def __init__(
-            self,
-            workload_generator: SyntheticWorkloadGenerator,
-            scheduler: NullScheduler,
-            job_slots: slice,
-    ):
-        if (
-                not isinstance(workload_generator, SyntheticWorkloadGenerator)
-        ) or not isinstance(scheduler, NullScheduler):
-            raise AssertionError('Invalid arguments received.')
-
-        self.current_time = 0
-        self.scheduler = scheduler
-        self.simulation_start_time = 0
-        self.workload = workload_generator
-        self.job_slots = job_slots
-
-        self.current_time = self.last_job_time = 0
-        if isinstance(workload_generator, SyntheticWorkloadGenerator):
-            first_job_time = cast(
-                Job, workload_generator.peak()
-            ).submission_time - 1
-            workload_generator.current_time = first_job_time
-            scheduler.job_events.time = first_job_time
-            scheduler.current_time = first_job_time
-            self.current_time = first_job_time
-
-    def rl_step(
-            self, action: int, listjobs: Callable[[], List[Job]]
-    ) -> List[List[Job]]:
-        "Returns a list of jobs for each successful intermediate time step."
-
-        if self.scheduler.step(action):
-            return [[]]
-
-        jobs: List[List[Job]] = []
-        self.current_time += 1
-        while True:
-            j = self.workload.step()
-            if j:
-                self.scheduler.submit(j)
-                self.last_job_time = self.current_time
-            self.scheduler.forward_time()
-            jobs.append(listjobs())
-            if self.scheduler.some_job_fits(self.job_slots):
-                break
-        return jobs
-
-
 class TimeBasedDeepRmSimulator:
     last_job_time: int
     scheduler: NullScheduler
@@ -146,12 +86,12 @@ class TimeBasedDeepRmSimulator:
 
     def __init__(
             self,
-            workload_generator: SyntheticWorkloadGenerator,
+            workload_generator: SwfWorkload,
             scheduler: NullScheduler,
             job_slots: slice,
     ):
         if (
-                not isinstance(workload_generator, SyntheticWorkloadGenerator)
+                not isinstance(workload_generator, SwfWorkload)
         ) or not isinstance(scheduler, NullScheduler):
             raise AssertionError('Invalid arguments received.')
 
@@ -161,17 +101,13 @@ class TimeBasedDeepRmSimulator:
         self.current_time = self.last_job_time = 0
         self.job_slots = job_slots
 
-        if isinstance(workload_generator, SyntheticWorkloadGenerator):
+        if isinstance(workload_generator, SwfWorkload):
             first_job_time = cast(
-                Job, workload_generator.peak()
+                Job, workload_generator.pick()
             ).submission_time - 1
             workload_generator.current_time = first_job_time
             scheduler.job_events.time = first_job_time
             scheduler.current_time = first_job_time
-
-    def step(self, _=True):
-        """Not implemented in DeepRmSimulator"""
-        raise NotImplementedError('This simulator cannot follow the base API')
 
     def rl_step(
             self, action: int, listjobs: Callable[[], List[Job]]

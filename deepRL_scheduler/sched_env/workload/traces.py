@@ -89,7 +89,7 @@ class TraceGenerator(WorkloadGenerator):
     def __iter__(self) -> Iterator[Optional[Job]]:
         return iter(self.trace)
 
-    def peak(self) -> Optional[Job]:
+    def pick(self) -> Optional[Job]:
         job = next(self)
         if self.current_element > 0:
             self.current_element -= 1
@@ -109,33 +109,24 @@ class SwfGenerator(TraceGenerator):
             generation.
         processors : int
             The number of processors in this trace
-        memory : int
-            The amount of memory in this trace
         restart : bool
             Whether to restart from the beginning of the file when we reach
             its end (or, in the case we're using an offset and a length, to
             restart from the offset up to the length)
-        ignore_memory : bool
-            Whether to ignore (or not) memory usage
     """
-
-    tracefile: str
-    ignore_memory: bool
 
     def __init__(
             self,
             tracefile,
             processors,
-            memory,
             offset=0,
             length=None,
             restart=False,
-            ignore_memory=False,
     ):
 
         super().__init__(
             restart,
-            list(parse_swf(tracefile, processors, memory, ignore_memory)),
+            list(parse_swf(tracefile, processors)),
         )
         self.tracefile = tracefile
 

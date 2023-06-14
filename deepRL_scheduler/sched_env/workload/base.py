@@ -30,5 +30,5 @@ class WorkloadGenerator(ABC):
         """Returns the length of the workload. Zero if unbounded."""
 
     @abstractmethod
-    def peak(self):
-        """Peeks what would be the next job"""
+    def pick(self):
+        """Pick what would be the next job"""

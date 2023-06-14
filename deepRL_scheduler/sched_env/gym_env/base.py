@@ -12,7 +12,7 @@ import numpy as np
 
 from deepRL_scheduler.sched_env.gym_env.simulator import SimulationType, DeepRmSimulator
 from deepRL_scheduler.sched_env.scheduler import NullScheduler
-from deepRL_scheduler.sched_env.gym_env.workload import build as build_workload
+from deepRL_scheduler.sched_env.workload.swf_parser import build as build_workload
 
 BACKLOG_SIZE = 60
 MAXIMUM_NUMBER_OF_ACTIVE_JOBS = 40  # Number of colors in image
@@ -20,16 +20,14 @@ MAX_TIME_TRACKING_SINCE_LAST_JOB = 10
 
 TIME_HORIZON = 20
 JOB_SLOTS = 5
-AMOUNT_OF_MEMORY = 10
+
 NUMBER_OF_PROCESSORS = 10
 MAXIMUM_JOB_LENGTH = 15
 MAXIMUM_JOB_SIZE = 10
 NEW_JOB_RATE = 0.7
 SMALL_JOB_CHANCE = 0.8
 DEFAULT_WORKLOAD = {
-    'dict': 'lublin',
-    'length': 128,
-    'nodes': 128,
+    'path': './dataset/NASA-iPSC-1993-3.1-cln.swf'
 }
 
 
@@ -58,7 +56,6 @@ class BaseRmEnv(ABC, gym.Env):
     time_limit: int
     job_num_cap: int
     time_horizon: int
-    ignore_memory: bool
     color_index: List[int]
     color_cache: Dict[int, int]
     simulator: DeepRmSimulator
@@ -115,15 +112,13 @@ class BaseRmEnv(ABC, gym.Env):
         }
 
         self.backlog_size = kwargs.get('backlog_size', BACKLOG_SIZE)
-        self.memory = kwargs.get('memory', AMOUNT_OF_MEMORY)
         self.processors = kwargs.get('processors', NUMBER_OF_PROCESSORS)
-        self.ignore_memory = kwargs.get('ignore_memory', False)
 
         self.workload_config = kwargs.get('workload', DEFAULT_WORKLOAD)
         wl = build_workload(self.workload_config)
 
         scheduler = NullScheduler(
-            self.processors, self.memory, ignore_memory=self.ignore_memory
+            self.processors
         )
         self.simulator = DeepRmSimulator(
             wl,
@@ -134,7 +129,7 @@ class BaseRmEnv(ABC, gym.Env):
 
     def reset(self) -> np.ndarray:
         scheduler = NullScheduler(
-            self.processors, self.memory, ignore_memory=self.ignore_memory
+            self.processors
         )
         wl = build_workload(self.workload_config)
         if self.update_time_limit and hasattr(wl, 'trace'):
@@ -169,9 +164,6 @@ class BaseRmEnv(ABC, gym.Env):
         return ret
 
     def build_job_slots(self, wait):
-        memory = np.zeros(
-            (self.job_slots, self.time_horizon, self.scheduler.total_memory)
-        )
         processors = np.zeros(
             (
                 self.job_slots,
@@ -189,9 +181,7 @@ class BaseRmEnv(ABC, gym.Env):
                 else j.requested_time,
             )
             processors[i, time_slice, : j.requested_processors] = 1.0
-            if j.requested_memory != -1:
-                memory[i, time_slice, : j.requested_memory] = 1.0
-        return (processors,) if self.ignore_memory else (processors, memory)
+        return (processors,)
 
     def _convert_state(self, current, wait, backlog, time):
         current = self.build_current_state(current)

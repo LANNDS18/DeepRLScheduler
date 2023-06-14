@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from typing import Union
 
 import numpy as np
@@ -9,7 +12,7 @@ import gym.spaces.tuple
 from deepRL_scheduler.sched_env.job import Job
 from deepRL_scheduler.sched_env.gym_env.base import BaseRmEnv
 from deepRL_scheduler.sched_env.gym_env.simulator import DeepRmSimulator
-from deepRL_scheduler.sched_env.gym_env.workload import SyntheticWorkloadGenerator
+from deepRL_scheduler.sched_env.workload.swf_parser import SwfWorkload
 
 import logging
 
@@ -28,7 +31,7 @@ class DeepRmEnv(BaseRmEnv):
     n_resources: int
     use_raw_sate: bool
     simulator: DeepRmSimulator
-    workload: SyntheticWorkloadGenerator
+    workload: SwfWorkload
     observation_space: Union[gym.spaces.tuple.Tuple, gym.spaces.box.Box]
     action_space: gym.spaces.discrete.Discrete
 
@@ -66,8 +69,7 @@ class DeepRmEnv(BaseRmEnv):
             shape=(
                 self.time_horizon,
                 (
-                    (0 if self.ignore_memory else (self.job_slots + 1))
-                    * self.scheduler.total_memory
+                    0 * 1
                 )
                 + (self.job_slots + 1) * self.scheduler.number_of_processors
                 + self.backlog_width
@@ -76,11 +78,7 @@ class DeepRmEnv(BaseRmEnv):
         )
 
     def setup_raw_spaces(self):
-        self.memory_space = gym.spaces.box.Box(
-            low=0.0,
-            high=1.0,
-            shape=(self.time_horizon, self.scheduler.total_memory),
-        )
+
         self.processor_space = gym.spaces.box.Box(
             low=0.0,
             high=1.0,
@@ -89,15 +87,7 @@ class DeepRmEnv(BaseRmEnv):
         self.backlog_space = gym.spaces.box.Box(
             low=0.0, high=1.0, shape=(self.time_horizon, self.backlog_width)
         )
-        self.memory_slots_space = gym.spaces.box.Box(
-            low=0.0,
-            high=1.0,
-            shape=(
-                self.job_slots,
-                self.time_horizon,
-                self.scheduler.total_memory,
-            ),
-        )
+
         self.processor_slots_space = gym.spaces.box.Box(
             low=0.0,
             high=1.0,
@@ -112,9 +102,7 @@ class DeepRmEnv(BaseRmEnv):
         self.observation_space = gym.spaces.tuple.Tuple(
             (
                 self.processor_space,
-                self.memory_space,
                 self.processor_slots_space,
-                self.memory_slots_space,
                 self.backlog_space,
                 self.time_since_space,
             )
