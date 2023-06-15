@@ -1,10 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """base - base module for all workload generators"""
 
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
-from deepRL_scheduler.sched_env.job import Job
+from sched_env.job import Job
 
 
 class WorkloadGenerator(ABC):
@@ -31,4 +33,4 @@ class WorkloadGenerator(ABC):
 
     @abstractmethod
     def pick(self):
-        """Pick what would be the next job"""
+        """Peeks what would be the next job"""

@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""cluster - Classes for cluster management
-
-The workhorse of this module is the :class:`schedgym.cluster.Cluster` class,
-which manages resources in a cluster.
+"""
+cluster - Classes for cluster management
 """
 
 import copy
 from typing import Tuple, Iterable, Optional
 
-from deepRL_scheduler.sched_env import pool
-from deepRL_scheduler.sched_env.job import Job, Resource
-from deepRL_scheduler.sched_env.event import JobEvent, EventType
+from . import pool
+
+from .job import Job, Resource
+from .event import JobEvent, EventType
 
 # pylint: disable=C
 RESOURCE_TYPE = Tuple[Iterable[pool.Interval], Iterable[pool.Interval]]
@@ -32,9 +31,9 @@ class Cluster:
     processors: pool.ResourcePool
 
     def __init__(
-        self,
-        processors: int,
-        used_processors: Optional[Resource] = None,
+            self,
+            processors: int,
+            used_processors: Optional = None,
 
     ):
         self.processors = pool.ResourcePool(
@@ -53,10 +52,6 @@ class Cluster:
         ----------
             job : Job
                 The job to check against in this cluster
-
-        Returns:
-            True if the job fits the cluster (can be added to the cluster), and
-            False otherwise
         """
         return self.processors.fits(job.requested_processors)
 
@@ -106,12 +101,11 @@ class Cluster:
         self.processors.free(job.resources.processors)
 
     def find_resources_at_time(
-        self, time: int, job: Job, events: Iterable[JobEvent]
+            self, time: int, job: Job, events: Iterable[JobEvent]
     ) -> Resource:
         """Finds resources for a job at a given time step.
 
-        This is probably the most complex (and most important) function in this
-        class. To find an allocation for a job, we have to iterate through the
+        To find an allocation for a job, we have to iterate through the
         queue of events and evaluating the state of the system given that set
         of events to check whether a given job would fit the system.
 
@@ -128,25 +122,20 @@ class Cluster:
             events : Iterable[JobEvent]
                 A set of events that will play out in the future
         """
-        def valid(e, time):
-            return time + 1 <= e.time < job.requested_time + time
+
+        def valid(e, t):
+            return t + 1 <= e.time < job.requested_time + t
 
         used = Resource(self.processors.used_pool)
-        for event in (
-            e
-            for e in events
-            if (valid(e, time) and e.type == EventType.JOB_START)
-        ):
+        for event in (e for e in events if (valid(e, time) and e.type == EventType.JOB_START)):
             for i in event.processors:
                 used.processors.add(i)
         used.processors.merge_overlaps()
-        return Cluster(
-            self.processors.size,
-            used.processors,
-        ).find(job)
+
+        return Cluster(self.processors.size, used.processors).find(job)
 
     @property
-    def state(self) -> Tuple[Tuple[int, int, dict], ...]:
+    def state(self) -> Tuple[int, int, dict]:
         """Gets the current state of the cluster as numpy arrays.
 
         Returns:
@@ -158,11 +147,11 @@ class Cluster:
             {(i.begin, i.end): i.data for i in self.processors.used_pool},
         )
 
-        return (processors,)
+        return processors
 
     def __bool__(self):
         return (
-            self.processors.free_resources != 0
+                self.processors.free_resources != 0
         )
 
     def __repr__(self):

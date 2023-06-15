@@ -3,10 +3,12 @@
 """
 
 import enum
+
+import random
 import warnings
 from collections import namedtuple
 
-from deepRL_scheduler.sched_env.resources import Resource
+from .resource import Resource, PrimaryResource
 
 JobState = namedtuple(
     'JobState',
@@ -56,16 +58,6 @@ class Job:
     of helper methods to compute slowdown and bounded slowdown of a job. The
     initializer arguments follow the same ordering and have the same meaning
     as those in the SWF description.
-
-    This makes use of the :class:`schedgym.resource.Resource` class to keep
-    track of the assigned resources to the job. Resource assignment itself is
-    performed by
-    :func:`schedgym.scheduler.scheduler.Scheduler.assign_schedule`.
-
-    The figure below shows the relationship between jobs, resources, and the
-    basic data structure for resource management (`IntervalTree`).
-
-    .. image:: /img/job-resource.svg
     """
 
     resources: Resource
@@ -144,6 +136,7 @@ class Job:
         return (
             f'Job<{self.id}, {self.status.name}, start={self.start_time}, '
             f'processors={self.requested_processors}, '
+            f'memory={self.requested_memory} '
             f'duration={self.execution_time}>'
         )
 
@@ -260,3 +253,129 @@ class Job:
             self.queued_work,
             self.free_processors,
         )
+
+
+class JobParameters:
+    """Class for using with generative models for job creation.
+
+    Assumes two types of jobs:
+        1. "Small" jobs and
+        2. "Large" jobs
+
+    A job has probability s of being small and (1-s) of being large.
+
+    Moreover, jobs have a dominant resource to distinguish between CPU-bound
+    and I/O bound jobs, with probability of being either CPU-bound and I/O
+    bound
+    0.5.
+
+    A user of this class must specify all bounds.
+
+    Parameters
+    ----------
+        lower_time_bound : int
+            The minimum time a job will run for
+        upper_time_bound : int
+            The maximum time a job will run for
+        lower_cpu_bound : int
+            The minimum number of processors a job will consume
+        upper_cpu_bound : int
+            The maximum number of processors a job will consume
+        lower_mem_bound : int
+            The minimum amount of memory a job will consume
+        upper_mem_bound : int
+            The maximum amount of memory a job will consume
+
+    Used by :class:`schedgym.workload.distribution.BinomialWorkloadGenerator`.
+    """
+
+    lower_time_bound: int
+    upper_time_bound: int
+    lower_resource_bound: int
+    upper_resource_bound: int
+
+    @staticmethod
+    def _validate_parameters(*args):
+        for param in args:
+            if param <= 0:
+                raise AssertionError(
+                    'Unable to work with non-positive bounds.'
+                )
+
+    def __init__(
+            self,
+            lower_time_bound: int,
+            upper_time_bound: int,
+            lower_cpu_bound: int,
+            upper_cpu_bound: int,
+            lower_mem_bound: int,
+            upper_mem_bound: int,
+    ):
+        self._validate_parameters(
+            lower_time_bound,
+            upper_time_bound,
+            lower_cpu_bound,
+            upper_cpu_bound,
+            lower_mem_bound,
+            upper_mem_bound,
+        )
+
+        self.lower_time_bound = lower_time_bound
+        self.upper_time_bound = upper_time_bound
+        self.lower_cpu_bound = lower_cpu_bound
+        self.upper_cpu_bound = upper_cpu_bound
+        self.lower_mem_bound = lower_mem_bound
+        self.upper_mem_bound = upper_mem_bound
+
+        self.resource_samplers = {
+            PrimaryResource.CPU:
+                lambda: random.randint(self.lower_cpu_bound, self.upper_cpu_bound),
+        }
+
+        self.job_id = 1
+        self.time_step = 0
+
+    def add_time(self, steps: int = 1) -> None:
+        """Increments time in the internal counter."""
+        if steps < 0:
+            raise AssertionError("Time can't be negative.")
+        self.time_step += steps
+
+    def sample(self, submission_time: int = 0) -> Job:
+        """Samples a new job.
+
+        Parameters
+        ----------
+            submission_time : int
+                The time at which the new sampled job would have been
+                submitted. If omitted, the current times step is used.
+        """
+        time_duration = random.randint(
+            self.lower_time_bound, self.upper_time_bound
+        )
+
+        cpu = self.resource_samplers[PrimaryResource.CPU]()
+
+        job = Job(
+            self.job_id,
+            submission_time if submission_time else self.time_step,
+            time_duration,
+            cpu,
+            0,
+            -1,
+            cpu,
+            time_duration,
+            -1,
+            JobStatus.WAITING,
+            1,
+            1,
+            1,
+            1,
+            1,
+            -1,
+            -1,
+            -1,
+        )
+        self.job_id += 1
+
+        return job

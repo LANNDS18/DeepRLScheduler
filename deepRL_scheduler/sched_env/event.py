@@ -55,9 +55,38 @@ class Event:
         """Clones this event.
 
         Returns:
-            A new event identical to this one
+            A new event identical to this one, but with no memory sharing.
         """
         return copy.copy(self)
+
+
+class ResourceEvent(Event):
+    """An event related to resource allocation or to the freeing of resources.
+
+    Parameters
+    ----------
+        time : int
+            The time at which this event occurs
+        type : EventType
+            What is the type of this event
+        resources : Iterable[Interval]
+            The resources that are being allocated/free'd by this event
+    """
+
+    resources: Iterable[Interval]
+    resource_type: ResourceType
+
+    def __init__(
+        self,
+        time: int,
+        type: EventType,
+        resource_type: ResourceType,
+        resources: Iterable[Interval],
+    ):
+        # pylint: disable=redefined-builtin
+        super().__init__(time, type)
+        self.resources = resources
+        self.resource_type = resource_type
 
 
 class JobEvent(Event):
