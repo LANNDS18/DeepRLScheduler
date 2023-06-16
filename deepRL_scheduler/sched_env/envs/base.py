@@ -11,7 +11,7 @@ import numpy as np
 import os
 
 from .simulator import DeepRmSimulator
-from sched_env.workload.distributional_generator import build as build_workload
+from ..workload.distributional_generator import build as build_workload
 from ..scheduler.null_scheduler import NullScheduler
 
 BACKLOG_SIZE = 60
@@ -164,11 +164,13 @@ class BaseRmEnv(ABC, gym.Env):
         return s
 
     def build_current_state(self, current):
-        ret = [np.zeros((self.time_horizon, sum(current[0][:-1])))]
+
+        ret = np.zeros((self.time_horizon, sum(current[0][:-1])))
+
         for t in range(self.time_horizon):
             for k, v in current[t][-1].items():
-                ret[0][t][slice(*k)] = v
-        return ret
+                ret[t][slice(*k)] = v
+        return [ret]
 
     def build_job_slots(self, wait):
         processors = np.zeros(
@@ -188,7 +190,7 @@ class BaseRmEnv(ABC, gym.Env):
                 else j.requested_time,
             )
             processors[i, time_slice, : j.requested_processors] = 1.0
-        return (processors,)
+        return processors
 
     def _convert_state(self, current, wait, backlog, time):
         current = self.build_current_state(current)

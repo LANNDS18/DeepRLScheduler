@@ -24,9 +24,9 @@ import collections.abc
 
 import numpy as np
 
-from sched_env.cluster import Cluster
-from sched_env.job import Job, JobStatus, Resource
-from sched_env.event import JobEvent, EventType, EventQueue
+from ..cluster import Cluster
+from ..job import Job, JobStatus, Resource
+from ..event import JobEvent, EventType, EventQueue
 
 
 class Stats(NamedTuple):

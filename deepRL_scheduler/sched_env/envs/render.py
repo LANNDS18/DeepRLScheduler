@@ -54,13 +54,13 @@ class DeepRmRgbRenderer(object):
         ax_backlog = plt.subplot2grid((lines, 3), (0, 2), rowspan=lines)
         # End of Axes }}}
 
-        for i, (ax_current, ax_wait) in enumerate(zip(axs_current, axs_wait)):
-            self.plot_substate(
-                ax_current, f'Current resources {i}', current[i]
-            )
-            self.plot_substate(
-                ax_wait, f'Waiting jobs stack {i}', np.mean(wait[i], axis=0)
-            )
+        self.plot_substate(
+            axs_current[0], f'Processors', current[0]
+        )
+
+        self.plot_substate(
+            axs_wait[0], f'Waiting jobs stack', np.mean(wait, axis=0)
+        )
         self.plot_substate(ax_backlog, 'Backlog', backlog, True)
 
         fig.tight_layout()
@@ -87,7 +87,7 @@ class DeepRmHumanRenderer(DeepRmRgbRenderer, pyglet.window.Window):
         self.window.set_visible()
         self.window.on_draw = self.on_draw
 
-    def on_draw(self):
+    def on_draw(self, **kwargs):
         self.window.clear()
         if self.rendering is not None:
             height, width, _ = self.rendering.shape

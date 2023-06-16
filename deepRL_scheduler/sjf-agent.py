@@ -5,23 +5,22 @@ import gym
 import numpy as np
 import sched_env.envs as deeprm
 
-EPISODES = 10
-MAX_EPISODE_LENGTH = 20000
+EPISODES = 1
+MAX_EPISODE_LENGTH = 30
 
 
 def sjf_action(observation):
     "Selects the job SJF (Shortest Job First) would select."
 
     current, wait, _, _ = observation
-    best = wait.shape[2] + 1  # infinity
-    best_idx = wait.shape[1]
+    best = wait.shape[1] + 1  # infinity
+    best_idx = wait.shape[0]
+    free = current.shape[-1] - np.sum(current[:, 0, :] != 0)
 
-    free = np.ones(current.shape[0]) * current.shape[-1] - np.sum(current[:, 0, :] != 0)
-
-    for slot in range(wait.shape[1]):
-        required_resources = (wait[:, slot, 0, :] != 0).sum(axis=1)
+    for slot in range(wait.shape[0]):
+        required_resources = (wait[slot, 0, :] != 0).sum(axis=0)
         if np.all(required_resources) and np.all(required_resources <= free):
-            tmp = np.sum(wait[0, slot, :, 0])
+            tmp = np.sum(wait[slot, :, 0])
             if tmp < best:
                 best_idx = slot
                 best = tmp
