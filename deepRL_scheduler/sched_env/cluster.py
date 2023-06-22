@@ -13,9 +13,6 @@ from . import pool
 from .job import Job, Resource
 from .event import JobEvent, EventType
 
-# pylint: disable=C
-RESOURCE_TYPE = Tuple[Iterable[pool.Interval], Iterable[pool.Interval]]
-
 
 class Cluster:
     """A cluster as a set of resources.
@@ -32,7 +29,7 @@ class Cluster:
 
     def __init__(
             self,
-            processors: int,
+            processors,
             used_processors: Optional = None,
 
     ):
@@ -41,9 +38,9 @@ class Cluster:
         )
 
     @property
-    def free_resources(self) -> Tuple[int, int]:
+    def free_resources(self) -> int:
         """The set of resources *not* in use in this cluster."""
-        return self.processors.free_resources, 0
+        return self.processors.free_resources
 
     def fits(self, job: Job) -> bool:
         """Checks whether a job fits in this cluster.

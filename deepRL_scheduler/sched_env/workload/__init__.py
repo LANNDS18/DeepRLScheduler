@@ -10,12 +10,11 @@ trace-based workloads in the Standard Workload Format.
 from .base import WorkloadGenerator
 from .distribution import BinomialWorkloadGenerator
 from .distribution import DistributionalWorkloadGenerator
-from .trace import TraceGenerator, SwfGenerator
+from .trace import SwfGenerator
 
 __all__ = [
     'WorkloadGenerator',
     'DistributionalWorkloadGenerator',
     'BinomialWorkloadGenerator',
-    'TraceGenerator',
     'SwfGenerator',
 ]

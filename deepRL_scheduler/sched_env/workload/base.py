@@ -6,7 +6,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List
 
-from sched_env.job import Job
+from ..job import Job
 
 
 class WorkloadGenerator(ABC):

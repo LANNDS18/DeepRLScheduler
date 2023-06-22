@@ -76,6 +76,11 @@ class NullScheduler(Scheduler):
         self.current_time += 1
         self.schedule()
 
+    def sync_generator_time(self, wl):
+        self.current_time = wl.current_element
+
+
+
     @property
     def action_space(self):
         """Helper that gives the number of actions available for the agent."""

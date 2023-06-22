@@ -14,14 +14,14 @@ from .simulator import DeepRmSimulator
 from ..workload.distributional_generator import build as build_workload
 from ..scheduler.null_scheduler import NullScheduler
 
-BACKLOG_SIZE = 60
+BACKLOG_SIZE = 200
 MAXIMUM_NUMBER_OF_ACTIVE_JOBS = 40  # Number of colors in image
 MAX_TIME_TRACKING_SINCE_LAST_JOB = 10
 
-TIME_HORIZON = 20
+TIME_HORIZON = 100
 JOB_SLOTS = 5
 
-NUMBER_OF_PROCESSORS = 10
+NUMBER_OF_PROCESSORS = 128
 
 TRACE_FILE = os.path.join("./sched_env/dataset/HPC2N-2002-2.2-cln.swf")
 
@@ -31,8 +31,8 @@ SWF_WORKLOAD = {
 }
 
 
-MAXIMUM_JOB_LENGTH = 15
-MAXIMUM_JOB_SIZE = 10
+MAXIMUM_JOB_LENGTH = 1500
+MAXIMUM_JOB_SIZE = 128
 NEW_JOB_RATE = 0.7
 SMALL_JOB_CHANCE = 0.8
 DEFAULT_WORKLOAD = {
@@ -41,6 +41,12 @@ DEFAULT_WORKLOAD = {
     'max_job_size': MAXIMUM_JOB_SIZE,
     'max_job_len': MAXIMUM_JOB_LENGTH,
     'small_job_chance': SMALL_JOB_CHANCE,
+}
+
+DEFAULT_WORKLOAD = {
+    'type': 'k',
+    'trace_file': TRACE_FILE,
+    'processors': NUMBER_OF_PROCESSORS,
 }
 
 
@@ -234,6 +240,70 @@ class BaseRmEnv(ABC, gym.Env):
         np.random.seed(seed)
         random.seed(seed)
         return [seed]
+
+
+    def f2_score(self, job):
+        submit_time = job.submit_time
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        # run_time = job.run_time
+        # f2: r^(1/2)*n + 25600 * log10(s)
+        return np.sqrt(request_time) * request_processors + 25600 * np.log10(submit_time)
+
+    @staticmethod
+    def f3_score(job):
+        submit_time = job.submit_time
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        # run_time = job.run_time
+        # f3: r * n + 6860000 * log10(s)
+        return request_time * request_processors + 6860000 * np.log10(submit_time)
+
+
+    @staticmethod
+    def f4_score(job):
+        submit_time = job.submit_time
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        # run_time = job.run_time
+        # f4: r * sqrt(n) + 530000 * log10(s)
+        return request_time * np.sqrt(request_processors) + 530000 * np.log10(submit_time)
+
+    @staticmethod
+    def sjf_score(job):
+        # run_time = job.run_time
+        request_time = job.request_time
+        submit_time = job.submit_time
+        # if request_time is the same, pick whichever submitted earlier
+        return request_time, submit_time
+
+    @staticmethod
+    def smallest_score(job):
+        request_processors = job.request_number_of_processors
+        submit_time = job.submit_time
+        # if request_time is the same, pick whichever submitted earlier
+        return request_processors, submit_time
+
+    @staticmethod
+    def wfp_score(job):
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        waiting_time = job.scheduled_time - job.submit_time
+        return -np.power(float(waiting_time) / request_time, 3) * request_processors
+
+    @staticmethod
+    def uni_score(job):
+        submit_time = job.submit_time
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        waiting_time = job.scheduled_time - job.submit_time
+
+        return -(waiting_time + 1e-15) / (np.log2(request_processors + 1e-15) * request_time)
+
+    @staticmethod
+    def fcfs_score(job):
+        submit_time = job.submit_time
+        return submit_time
 
     def compute_reward(self, joblist):
         return -np.sum([1 / j.execution_time for j in joblist])
