@@ -136,12 +136,12 @@ class HPCEnv(gym.Env):
                 # print(self.sjf_scores)
 
     def build_observation_space(self):
+        #todo: represent the cluster into correct machine state
 
         time_stamp = 1
 
         job_state = spaces.Box(low=0.0, high=1.0, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
         machine_state = spaces.Box()
-
 
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -262,7 +262,7 @@ class HPCEnv(gym.Env):
         self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.sjf_score).values()))
         self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.f1_score).values()))
 
-        print(self.scheduled_scores)
+        print("scheduled_scores:", self.scheduled_scores)
 
         return self.build_observation(), self.build_critic_observation()
 
