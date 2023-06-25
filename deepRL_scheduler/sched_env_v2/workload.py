@@ -60,7 +60,7 @@ class Workloads:
               ";max procs:", self.max_procs,
               ";max execution time:", self.max_exec_time)
 
-        self.all_jobs.sort(key=lambda job: job.id)
+        self.all_jobs.sort(key=lambda job: job.job_id)
 
     def size(self):
         return len(self.all_jobs)

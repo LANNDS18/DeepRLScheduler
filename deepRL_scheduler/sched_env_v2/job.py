@@ -5,7 +5,7 @@ class Job:
     def __init__(self, line="0        0      0    0   0     0    0   0  0 0  0   0   0  0  0 0 0 0"):
         line = line.strip()
         s_array = re.split("\\s+", line)
-        self.id = int(s_array[0])
+        self.job_id = int(s_array[0])
         self.submit_time = int(s_array[1])
         self.wait_time = int(s_array[2])
         self.run_time = int(s_array[3])
@@ -66,21 +66,19 @@ class Job:
         self.slurm_tres_cpu = 0.0
 
     def __eq__(self, other):
-        return self.id == other.id
+        return self.job_id == other.job_id
 
     def __lt__(self, other):
-        return self.id < other.id
+        return self.job_id < other.job_id
 
     def __str__(self):
         return (
-            f'Job<{self.id}, {self.status}, start={self.submit_time}, '
+            f'Job<{self.job_id}, {self.status}, start={self.submit_time}, '
             f'processors={self.request_number_of_processors}, '
             f'memory={self.request_memory} '
             f'duration={self.run_time}>'
         )
 
-
     def __feature__(self):
         return [self.submit_time, self.request_number_of_processors, self.request_time,
                 self.user_id, self.group_id, self.executable_number, self.queue_number]
-

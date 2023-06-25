@@ -14,6 +14,8 @@ class Cluster:
         for i in range(self.total_node):
             self.all_nodes.append(Pool(i))
 
+        self.state_list = {}
+
     @property
     def free_resources(self) -> int:
         """The set of resources *not* in use in this cluster."""
@@ -44,7 +46,7 @@ class Cluster:
         for m in self.all_nodes:
             if allocated == request_node:
                 return allocated_nodes
-            if m.taken_by_job(id):
+            if m.taken_by_job(job.job_id):
                 allocated += 1
                 self.used_node += 1
                 self.free_node -= 1
@@ -75,13 +77,15 @@ class Cluster:
             m.reset()
 
     @property
-    def state(self) -> Tuple[int, int]:
+    def state(self) -> Tuple[dict, int, int]:
         """Gets the current state of the cluster as numpy arrays.
 
         Returns:
             Tuple: a pair containing the number of processors used
         """
+        self.state_list = {a.machine_id: a.running_job_id if a.running_job_id else -1 for a in self.all_nodes}
         processors = (
+            self.state_list,
             self.free_resources,
             self.used_node,
         )

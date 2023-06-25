@@ -10,10 +10,8 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = HPCEnv(batch_job_slice=700, build_sjf=True)
-    env.seed(0)
-    env.my_init(workload_file=workload_file)
-
+    env = HPCEnv(batch_job_slice=700, build_sjf=True, seed=0)
+    env.load_job_trace(workload_file=workload_file)
     env.reset()
 
     for _ in range(500):

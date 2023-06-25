@@ -1,6 +1,6 @@
 class Pool:
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, machine_id):
+        self.machine_id = machine_id
         self.running_job_id = -1
         self.is_free = True
         self.job_history = []
@@ -28,7 +28,7 @@ class Pool:
         self.job_history = []
 
     def __eq__(self, other):
-        return self.id == other.id
+        return self.machine_id == other.machine_id
 
     def __str__(self):
-        return "M[" + str(self.id) + "]"
+        return "M[" + str(self.machine_id) + "] "
