@@ -1,6 +1,5 @@
 import sys
 import gym
-import random
 import numpy as np
 
 from abc import ABC
@@ -67,7 +66,7 @@ class HPCEnv(gym.Env, ABC):
         self.penalty = 0
         self.pivot_job = False
         self.scheduled_scores = []
-        self.enable_pre_workloads = True
+        self.enable_pre_workloads = False
         self.pre_workloads = []
 
         self.shuffle = shuffle
@@ -141,13 +140,14 @@ class HPCEnv(gym.Env, ABC):
                 # print(self.sjf_scores)
 
     @staticmethod
-    def build_observation_space(self):
+    def build_observation_space():
         # todo: represent the cluster into correct machine state
 
-        time_stamp = 1
+        # time_stamp = 1
 
-        job_state = spaces.Box(low=0.0, high=1.0, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
-        machine_state = spaces.Box(low=-1, high=100000, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
+        # job_state = spaces.Box(low=0.0, high=1.0, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
+
+        # machine_state = spaces.Box(low=-1, high=100000, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
         pass
 
     @staticmethod
@@ -208,7 +208,8 @@ class HPCEnv(gym.Env, ABC):
                 if self.cluster.fits(job_tmp):
                     self.running_jobs.append(job_tmp)
                     job_tmp.scheduled_time = max(0,
-                                                 (self.current_timestamp - random.randint(0, max(runtime_of_job, 1))))
+                                                 (self.current_timestamp - self.np_random.randint(0, max(runtime_of_job,
+                                                                                                         1))))
                     # job_tmp.scheduled_time = max(0, (self.current_timestamp - runtime_of_job/2))
                     job_tmp.allocated_machines = self.cluster.allocate(job_tmp)
                     self.pre_workloads.append(job_tmp)
@@ -333,7 +334,7 @@ class HPCEnv(gym.Env, ABC):
 
         earliest_start_time = self.current_timestamp
         # sort all running jobs by estimated finish time
-        self.running_jobs.sort(key=lambda running_job: (running_job.scheduled_time + running_job.request_time))
+        self.running_jobs.sort(key=lambda running: (running.scheduled_time + running.request_time))
         free_processors = self.cluster.free_node * self.cluster.num_procs_per_node
         for running_job in self.running_jobs:
             free_processors += len(running_job.allocated_machines) * self.cluster.num_procs_per_node
@@ -360,7 +361,7 @@ class HPCEnv(gym.Env, ABC):
 
             # move to the next timestamp
             assert self.running_jobs
-            self.running_jobs.sort(key=lambda running_job: (running_job.scheduled_time + running_job.run_time))
+            self.running_jobs.sort(key=lambda running: (running.scheduled_time + running.run_time))
             next_resource_release_time = (self.running_jobs[0].scheduled_time + self.running_jobs[0].run_time)
             next_resource_release_machines = self.running_jobs[0].allocated_machines
 
@@ -487,7 +488,7 @@ class HPCEnv(gym.Env, ABC):
                 break
         self.visible_jobs.sort(key=lambda j: self.fcfs_score(j))
         if self.shuffle:
-            random.shuffle(self.visible_jobs)
+            self.np_random.shuffle(self.visible_jobs)
 
         # @ddai: optimize the observable jobs
         self.visible_jobs = []
@@ -497,41 +498,41 @@ class HPCEnv(gym.Env, ABC):
         else:
             visible_f1 = []
             f1_index = 0
-            self.job_queue.sort(key=lambda job: self.f1_score(job))
+            self.job_queue.sort(key=lambda _job: self.f1_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_f1.append(self.job_queue[i])
 
             visible_f2 = []
             f2_index = 0
-            self.job_queue.sort(key=lambda job: self.f2_score(job))
+            self.job_queue.sort(key=lambda _job: self.f2_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_f2.append(self.job_queue[i])
 
             visible_sjf = []
             sjf_index = 0
-            self.job_queue.sort(key=lambda job: self.sjf_score(job))
+            self.job_queue.sort(key=lambda _job: self.sjf_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_sjf.append(self.job_queue[i])
 
             visible_small = []
             small_index = 0
-            self.job_queue.sort(key=lambda job: self.smallest_score(job))
+            self.job_queue.sort(key=lambda _job: self.smallest_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_small.append(self.job_queue[i])
 
             visible_random = []
             random_index = 0
             shuffled = list(self.job_queue)
-            random.shuffle(shuffled)
+            self.np_random.shuffle(shuffled)
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_random.append(shuffled[i])
 
             index = 0
 
             while index < MAX_QUEUE_SIZE:
-                f1_job = visible_f1[f1_index]
+                # f1_job = visible_f1[f1_index]
                 f1_index += 1
-                f2_job = visible_f2[f2_index]
+                # f2_job = visible_f2[f2_index]
                 f2_index += 1
                 sjf_job = visible_sjf[sjf_index]
                 sjf_index += 1
@@ -545,20 +546,22 @@ class HPCEnv(gym.Env, ABC):
                 # if (not f2_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
                 #    self.visible_jobs.append(f2_job)
                 #    index += 1
-                if (not sjf_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
+                if (sjf_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
                     self.visible_jobs.append(sjf_job)
                     index += 1
-                if (not small_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
+                if (small_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
                     self.visible_jobs.append(small_job)
                     index += 1
-                if (not random_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
+                if (random_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
                     self.visible_jobs.append(random_job)
                     index += 1
 
         '''
-        @ddai: OPTIMIZE_OBSV. This time, we calculate the earliest start time of each job and expose that to the RL agent.
-        if it is 0, then the job can start now, if it is near 1, that means it will have to wait for a really long time to start.
-        The earliest start time is calculated based on current resources and the running jobs. It assumes no more jobs will be scheduled.
+        
+        @ddai: OPTIMIZE_OBSV. This time, we calculate the earliest start time of each job and expose that to the 
+        RL agent. if it is 0, then the job can start now, if it is near 1, that means it will have to wait for a 
+        really long time to start. The earliest start time is calculated based on current resources and the running 
+        jobs. It assumes no more jobs will be scheduled.
 
         # calculate the free resources at each outstanding ts
         free_processors_pair = []
@@ -574,7 +577,7 @@ class HPCEnv(gym.Env, ABC):
         self.pairs = []
         add_skip = False
         for i in range(0, MAX_QUEUE_SIZE):
-            if i < len(self.visible_jobs) and i < (MAX_QUEUE_SIZE):
+            if i < len(self.visible_jobs) and i < MAX_QUEUE_SIZE:
                 job = self.visible_jobs[i]
                 submit_time = job.submit_time
                 request_processors = job.request_number_of_processors
@@ -597,7 +600,8 @@ class HPCEnv(gym.Env, ABC):
                 normalized_earliest_start_time = min(float(earliest_start_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
                 '''
 
-                # add extra parameters, include "Requested Memory", "User Id", "Groupd Id", "Exectuable Id", if its value does not exist in the trace (-1), we set it to 1 by default.
+                # add extra parameters, include "Requested Memory", "User Id", "Groupd Id", "Exectuable Id",
+                # if its value does not exist in the trace (-1), we set it to 1 by default.
                 if job.request_memory == -1:
                     normalized_request_memory = 1
                 else:
