@@ -14,7 +14,7 @@ if __name__ == '__main__':
     env.load_job_trace(workload_file=workload_file)
     env.reset()
 
-    for i in range(500):
+    for i in range(5000):
         action = env.action_space.sample()
         state, rwd, done, rwd2, sjf, f1 = env.step(action)
         if done:

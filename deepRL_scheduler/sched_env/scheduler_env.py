@@ -684,7 +684,7 @@ class HPCEnv(gym.Env, ABC):
         if self.job_queue:
             return True
 
-        # if we need to add job, but can not add any more, return False indicating the job_queue is for sure empty now.
+        # if we need to add job, but can not add anymore, return False indicating the job_queue is for sure empty now.
         if self.next_arriving_job_idx >= self.last_job_in_batch:
             assert not self.job_queue
             return False

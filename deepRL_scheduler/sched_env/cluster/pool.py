@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 class Pool:
     def __init__(self, machine_id):
         self.machine_id = machine_id
