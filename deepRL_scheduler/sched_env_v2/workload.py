@@ -56,9 +56,11 @@ class Workloads:
         if self.max_procs == 0:
             self.max_procs = self.max_nodes
 
-        print("Max Allocated Processors:", str(self.max), ";max node:", self.max_nodes,
-              ";max procs:", self.max_procs,
-              ";max execution time:", self.max_exec_time)
+        print(f":WORKLOAD:\t"
+              f"Max Allocated Processors: {str(self.max)};"
+              f"max node: {self.max_nodes};"
+              f"max procs: {self.max_procs};"
+              f"max execution time: {self.max_exec_time}.")
 
         self.all_jobs.sort(key=lambda job: job.job_id)
 

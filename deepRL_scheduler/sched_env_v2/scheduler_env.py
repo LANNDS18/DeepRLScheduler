@@ -9,6 +9,8 @@ from gym.utils import seeding
 from .cluster import Cluster
 from .job import Job
 from .workload import Workloads
+from .job_scores import fcfs_score, f1_score, f2_score, sjf_score, smallest_score, \
+    average_slowdown, average_bounded_slowdown, average_waiting_time, average_turnaround_time, resource_utilization
 
 MAX_QUEUE_SIZE = 128
 MLP_SIZE = 256
@@ -72,6 +74,7 @@ class HPCEnv(gym.Env, ABC):
         self.shuffle = shuffle
         self.back_fill = back_fill
         self.skip = skip
+
         # 0: Average bounded slowdown, 1: Average waiting time
         # 2: Average turnaround time, 3: Resource utilization
         self.job_score_type = job_score_type
@@ -88,7 +91,7 @@ class HPCEnv(gym.Env, ABC):
         return self.np_random, _
 
     def load_job_trace(self, workload_file=''):
-        print("loading workloads from dataset:", workload_file)
+        print(f":ENV:\tloading workloads from dataset: {workload_file}")
         self.loads = Workloads(workload_file)
         self.cluster = Cluster(self.loads.max_nodes, self.loads.max_procs / self.loads.max_nodes)
         self.penalty_job_score = JOB_SEQUENCE_SIZE * self.loads.max_exec_time / 10
@@ -103,12 +106,12 @@ class HPCEnv(gym.Env, ABC):
             else:
                 max_index = min(self.batch_job_slice, self.loads.size()) - JOB_SEQUENCE_SIZE - 1
 
-            print("max index... initializing SJF Score Array", max_index)
+            print(f":ENV:\tmax index = {max_index} ... initializing SJF Score Array")
 
             while index <= max_index:
                 index += 1
                 if index % 100 == 0:
-                    print("index", index)
+                    print(f":ENV:\tindex {index}")
 
                 self.reset_env_component()
 
@@ -135,9 +138,7 @@ class HPCEnv(gym.Env, ABC):
 
                 self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
 
-                self.sjf_scores.append(sum(self.schedule_curr_sequence_reset(self.sjf_score).values()))
-
-                # print(self.sjf_scores)
+                self.sjf_scores.append(sum(self.schedule_curr_sequence_reset(sjf_score).values()))
 
     @staticmethod
     def build_observation_space():
@@ -149,44 +150,6 @@ class HPCEnv(gym.Env, ABC):
 
         # machine_state = spaces.Box(low=-1, high=100000, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
         pass
-
-    @staticmethod
-    def f1_score(job):
-        submit_time = job.submit_time
-        request_processors = job.request_number_of_processors
-        request_time = job.request_time
-        # run_time = job.run_time
-        return (np.log10(request_time if request_time > 0 else 0.1) * request_processors + 870 * np.log10(
-            submit_time if submit_time > 0 else 0.1))
-
-    @staticmethod
-    def f2_score(job):
-        submit_time = job.submit_time
-        request_processors = job.request_number_of_processors
-        request_time = job.request_time
-        # run_time = job.run_time
-        # f2: r^(1/2)*n + 25600 * log10(s)
-        return np.sqrt(request_time) * request_processors + 25600 * np.log10(submit_time)
-
-    @staticmethod
-    def sjf_score(job):
-        # run_time = job.run_time
-        request_time = job.request_time
-        submit_time = job.submit_time
-        # if request_time is the same, pick whichever submitted earlier
-        return request_time, submit_time
-
-    @staticmethod
-    def smallest_score(job):
-        request_processors = job.request_number_of_processors
-        submit_time = job.submit_time
-        # if request_time is the same, pick whichever submitted earlier
-        return request_processors, submit_time
-
-    @staticmethod
-    def fcfs_score(job):
-        submit_time = job.submit_time
-        return submit_time
 
     def fill_pre_workloads(self, size):
         # Generate some running jobs to randomly fill the cluster.
@@ -242,8 +205,7 @@ class HPCEnv(gym.Env, ABC):
         assert self.batch_job_slice == 0 or self.batch_job_slice >= job_sequence_size
 
         if self.build_sjf:
-            done = False
-            while not done:
+            while True:
                 if self.batch_job_slice == 0:
                     self.start = self.np_random.randint(job_sequence_size, (self.loads.size() - job_sequence_size - 1))
                 else:
@@ -251,7 +213,8 @@ class HPCEnv(gym.Env, ABC):
                                                         (self.batch_job_slice - job_sequence_size - 1))
 
                 if 10 < self.sjf_scores[self.start] < 150:
-                    done = True
+                    break
+
         else:
             if self.batch_job_slice == 0:
                 self.start = self.np_random.randint(job_sequence_size, (self.loads.size() - job_sequence_size - 1))
@@ -267,10 +230,10 @@ class HPCEnv(gym.Env, ABC):
 
         self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
 
-        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.sjf_score).values()))
-        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.f1_score).values()))
+        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(sjf_score).values()))
+        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(f1_score).values()))
 
-        print("scheduled_scores:", self.scheduled_scores)
+        print(":ENV:\tScheduled Scores:", self.scheduled_scores)
 
         return self.build_observation(), self.build_critic_observation()
 
@@ -345,7 +308,7 @@ class HPCEnv(gym.Env, ABC):
         while not self.cluster.fits(job):
 
             # try to backfill as many jobs as possible. Use FCFS
-            self.job_queue.sort(key=lambda _j: self.fcfs_score(_j))
+            self.job_queue.sort(key=lambda _j: fcfs_score(_j))
             job_queue_iter_copy = list(self.job_queue)
             for _j in job_queue_iter_copy:
                 if (self.current_timestamp + _j.request_time) < earliest_start_time:
@@ -375,28 +338,36 @@ class HPCEnv(gym.Env, ABC):
                 self.cluster.release(next_resource_release_machines)
                 self.running_jobs.pop(0)  # remove the first running job
 
+        return scheduled_logs
+
+    def job_score(self, job):
+        score_calculations = {
+            0: average_bounded_slowdown,
+            1: average_waiting_time,
+            2: average_turnaround_time,
+            3: resource_utilization,
+            4: average_slowdown,
+        }
+
+        try:
+            calculation = score_calculations[self.job_score_type]
+        except KeyError:
+            raise ValueError("Invalid job_score_type")
+
+        return calculation(job)
+
     def post_process_score(self, scheduled_logs):
-        if self.job_score_type == 0:
-            # bsld
-            for i in scheduled_logs:
-                scheduled_logs[i] /= self.num_job_in_batch
-        elif self.job_score_type == 1:
-            # wait time
-            for i in scheduled_logs:
-                scheduled_logs[i] /= self.num_job_in_batch
-        elif self.job_score_type == 2:
-            # turnaround time
-            for i in scheduled_logs:
-                scheduled_logs[i] /= self.num_job_in_batch
-        elif self.job_score_type == 3:
+        total_cpu_hour = 0
+        if self.job_score_type == 3:
             total_cpu_hour = (self.current_timestamp - self.loads[self.start].submit_time) * self.loads.max_procs
-            for i in scheduled_logs:
-                scheduled_logs[i] /= total_cpu_hour
-        elif self.job_score_type == 4:
-            for i in scheduled_logs:
+
+        for i in scheduled_logs:
+            if self.job_score_type in [0, 1, 2, 4]:
                 scheduled_logs[i] /= self.num_job_in_batch
-        else:
-            raise NotImplementedError
+            elif self.job_score_type == 3:
+                scheduled_logs[i] /= total_cpu_hour
+            else:
+                raise NotImplementedError("Invalid job_score_type")
 
     def reset_env_component(self):
         # print("start", self.start)
@@ -407,6 +378,30 @@ class HPCEnv(gym.Env, ABC):
         self.visible_jobs = []
         self.pairs = []
 
+    def heuristic_step(self, score_fn, scheduled_logs):
+
+        self.job_queue.sort(key=lambda j: score_fn(j))
+        job_for_scheduling = self.job_queue[0]
+
+        if not self.cluster.fits(job_for_scheduling):
+            if self.back_fill:
+                scheduled_logs = self.forward_single_step_resources_back_fill(job_for_scheduling, scheduled_logs)
+            else:
+                self.skip_for_resources_greedy(job_for_scheduling)
+
+        assert job_for_scheduling.scheduled_time == -1  # this job should never be scheduled before.
+        job_for_scheduling.scheduled_time = self.current_timestamp
+        # print(self.current_timestamp)
+        job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
+        self.running_jobs.append(job_for_scheduling)
+        score = self.job_score(job_for_scheduling)  # calculated reward
+        scheduled_logs[job_for_scheduling.job_id] = score
+        self.job_queue.remove(job_for_scheduling)
+
+        not_empty = self.moveforward_for_job()
+
+        return not_empty, scheduled_logs
+
     def schedule_curr_sequence_reset(self, score_fn):
         # schedule the sequence of jobs using heuristic algorithm. 
         scheduled_logs = {}
@@ -416,28 +411,10 @@ class HPCEnv(gym.Env, ABC):
         #     num_total = 0
         # start_time = time.time()
         while True:
-            self.job_queue.sort(key=lambda j: score_fn(j))
-            job_for_scheduling = self.job_queue[0]
-            # if f: num_total += 1 if selected job needs more resources, skip scheduling and try again after adding
-            # new jobs or releasing some resources
-            if not self.cluster.fits(job_for_scheduling):
-                if self.back_fill:
-                    self.forward_single_step_resources_back_fill(job_for_scheduling, scheduled_logs)
-                else:
-                    self.skip_for_resources_greedy(job_for_scheduling)
-
-            assert job_for_scheduling.scheduled_time == -1  # this job should never be scheduled before.
-            job_for_scheduling.scheduled_time = self.current_timestamp
-            # print(self.current_timestamp)
-            job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
-            self.running_jobs.append(job_for_scheduling)
-            score = self.job_score(job_for_scheduling)  # calculated reward
-            scheduled_logs[job_for_scheduling.job_id] = score
-            self.job_queue.remove(job_for_scheduling)
-
-            not_empty = self.moveforward_for_job()
+            not_empty, scheduled_logs = self.heuristic_step(score_fn, scheduled_logs)
             if not not_empty:
                 break
+
         self.post_process_score(scheduled_logs)
         # if f:
         #     print((time.time()-start_time)/num_total, num_total)
@@ -479,14 +456,14 @@ class HPCEnv(gym.Env, ABC):
 
     def build_observation(self):
         vector = np.zeros(MAX_QUEUE_SIZE * JOB_FEATURES, dtype=float)
-        self.job_queue.sort(key=lambda j: self.fcfs_score(j))
+        self.job_queue.sort(key=lambda j: fcfs_score(j))
         self.visible_jobs = []
         for i in range(0, MAX_QUEUE_SIZE):
             if i < len(self.job_queue):
                 self.visible_jobs.append(self.job_queue[i])
             else:
                 break
-        self.visible_jobs.sort(key=lambda j: self.fcfs_score(j))
+        self.visible_jobs.sort(key=lambda j: fcfs_score(j))
         if self.shuffle:
             self.np_random.shuffle(self.visible_jobs)
 
@@ -498,25 +475,25 @@ class HPCEnv(gym.Env, ABC):
         else:
             visible_f1 = []
             f1_index = 0
-            self.job_queue.sort(key=lambda _job: self.f1_score(_job))
+            self.job_queue.sort(key=lambda _job: f1_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_f1.append(self.job_queue[i])
 
             visible_f2 = []
             f2_index = 0
-            self.job_queue.sort(key=lambda _job: self.f2_score(_job))
+            self.job_queue.sort(key=lambda _job: f2_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_f2.append(self.job_queue[i])
 
             visible_sjf = []
             sjf_index = 0
-            self.job_queue.sort(key=lambda _job: self.sjf_score(_job))
+            self.job_queue.sort(key=lambda _job: sjf_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_sjf.append(self.job_queue[i])
 
             visible_small = []
             small_index = 0
-            self.job_queue.sort(key=lambda _job: self.smallest_score(_job))
+            self.job_queue.sort(key=lambda _job: smallest_score(_job))
             for i in range(0, MAX_QUEUE_SIZE):
                 visible_small.append(self.job_queue[i])
 
@@ -694,7 +671,7 @@ class HPCEnv(gym.Env, ABC):
                 break
 
         while not self.cluster.fits(job):
-            self.job_queue.sort(key=lambda _j: self.fcfs_score(_j))
+            self.job_queue.sort(key=lambda _j: fcfs_score(_j))
             job_queue_iter_copy = list(self.job_queue)
             for _j in job_queue_iter_copy:
                 if self.cluster.fits(_j) and (self.current_timestamp + _j.request_time) < earliest_start_time:
@@ -731,44 +708,6 @@ class HPCEnv(gym.Env, ABC):
                 self.current_timestamp = max(self.current_timestamp, next_resource_release_time)
                 self.cluster.release(next_resource_release_machines)
                 self.running_jobs.pop(0)  # remove the first running job.
-
-    def job_score(self, job_for_scheduling):
-
-        # 0: Average bounded slowdown, 1: Average waiting time
-        # 2: Average turnaround time, 3: Resource utilization 4: Average slowdown
-        if self.job_score_type == 0:
-            # bsld
-            _tmp = max(1.0, (float(
-                job_for_scheduling.scheduled_time - job_for_scheduling.submit_time + job_for_scheduling.run_time)
-                             /
-                             max(job_for_scheduling.run_time, 10)))
-        elif self.job_score_type == 1:
-            # wait time
-            _tmp = float(job_for_scheduling.scheduled_time - job_for_scheduling.submit_time)
-        elif self.job_score_type == 2:
-            # turnaround time
-            _tmp = float(
-                job_for_scheduling.scheduled_time - job_for_scheduling.submit_time + job_for_scheduling.run_time)
-        elif self.job_score_type == 3:
-            # utilization
-            _tmp = -float(job_for_scheduling.run_time * job_for_scheduling.request_number_of_processors)
-        elif self.job_score_type == 4:
-            # sld
-            _tmp = float(
-                job_for_scheduling.scheduled_time - job_for_scheduling.submit_time + job_for_scheduling.run_time) \
-                   / job_for_scheduling.run_time
-        else:
-            raise NotImplementedError
-
-            # Weight larger jobs.
-        # _tmp = _tmp * (job_for_scheduling.run_time * job_for_scheduling.request_number_of_processors)
-        return _tmp
-
-    def has_only_one_job(self):
-        if len(self.job_queue) == 1:
-            return True
-        else:
-            return False
 
     def skip_schedule(self):
         # schedule nothing, just move forward to next timestamp. It should 1) add a new job; 2) finish a running job;
@@ -830,10 +769,6 @@ class HPCEnv(gym.Env, ABC):
         else:
             # job_queue is empty and can not add new jobs as we reach the end of the sequence
             return True
-
-    def valid(self, a):
-        action = a[0]
-        return self.pairs[action][0]
 
     def step(self, a):
         job_for_scheduling = self.pairs[a][0]

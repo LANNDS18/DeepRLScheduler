@@ -1,5 +1,5 @@
 import os
-from sched_env_v2.HPCSimPickJobs import HPCEnv
+from sched_env_v2.scheduler_env import HPCEnv
 
 if __name__ == '__main__':
     import argparse
@@ -10,10 +10,12 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = HPCEnv(batch_job_slice=700, build_sjf=True, seed=0)
+    env = HPCEnv(batch_job_slice=700, build_sjf=True, back_fill=False, seed=0)
     env.load_job_trace(workload_file=workload_file)
     env.reset()
 
-    for _ in range(500):
+    for i in range(500):
         action = env.action_space.sample()
-        ob = env.step(action)
+        state, rwd, done, rwd2, sjf, f1 = env.step(action)
+        if done:
+            print(i)
