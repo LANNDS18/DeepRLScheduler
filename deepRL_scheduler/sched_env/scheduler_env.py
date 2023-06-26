@@ -1,16 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import sys
+from abc import ABC
+
 import gym
 import numpy as np
-
-from abc import ABC
 from gym import spaces
 from gym.utils import seeding
 
 from .cluster import Cluster
 from .job import Job
+from .job_scorer import JobScorer
 from .workload import Workloads
-from .job_scores import fcfs_score, f1_score, f2_score, sjf_score, smallest_score, \
-    average_slowdown, average_bounded_slowdown, average_waiting_time, average_turnaround_time, resource_utilization
 
 MAX_QUEUE_SIZE = 128
 MLP_SIZE = 256
@@ -78,6 +80,9 @@ class HPCEnv(gym.Env, ABC):
         # 0: Average bounded slowdown, 1: Average waiting time
         # 2: Average turnaround time, 3: Resource utilization
         self.job_score_type = job_score_type
+
+        self.scorer = JobScorer(job_score_type)
+
         self.batch_job_slice = batch_job_slice
 
         self.build_sjf = build_sjf
@@ -138,7 +143,7 @@ class HPCEnv(gym.Env, ABC):
 
                 self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
 
-                self.sjf_scores.append(sum(self.schedule_curr_sequence_reset(sjf_score).values()))
+                self.sjf_scores.append(sum(self.schedule_curr_sequence_reset(self.scorer.sjf_score).values()))
 
     @staticmethod
     def build_observation_space():
@@ -230,8 +235,8 @@ class HPCEnv(gym.Env, ABC):
 
         self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
 
-        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(sjf_score).values()))
-        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(f1_score).values()))
+        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.scorer.sjf_score).values()))
+        self.scheduled_scores.append(sum(self.schedule_curr_sequence_reset(self.scorer.f1_score).values()))
 
         print(":ENV:\tScheduled Scores:", self.scheduled_scores)
 
@@ -308,7 +313,7 @@ class HPCEnv(gym.Env, ABC):
         while not self.cluster.fits(job):
 
             # try to backfill as many jobs as possible. Use FCFS
-            self.job_queue.sort(key=lambda _j: fcfs_score(_j))
+            self.job_queue.sort(key=lambda _j: self.scorer.fcfs_score(_j))
             job_queue_iter_copy = list(self.job_queue)
             for _j in job_queue_iter_copy:
                 if (self.current_timestamp + _j.request_time) < earliest_start_time:
@@ -318,7 +323,7 @@ class HPCEnv(gym.Env, ABC):
                         _j.scheduled_time = self.current_timestamp
                         _j.allocated_machines = self.cluster.allocate(_j)
                         self.running_jobs.append(_j)
-                        score = self.job_score(_j)  # calculated reward
+                        score = self.scorer.job_score(_j)  # calculated reward
                         scheduled_logs[_j.job_id] = score
                         self.job_queue.remove(_j)  # remove the job from job queue
 
@@ -339,35 +344,6 @@ class HPCEnv(gym.Env, ABC):
                 self.running_jobs.pop(0)  # remove the first running job
 
         return scheduled_logs
-
-    def job_score(self, job):
-        score_calculations = {
-            0: average_bounded_slowdown,
-            1: average_waiting_time,
-            2: average_turnaround_time,
-            3: resource_utilization,
-            4: average_slowdown,
-        }
-
-        try:
-            calculation = score_calculations[self.job_score_type]
-        except KeyError:
-            raise ValueError("Invalid job_score_type")
-
-        return calculation(job)
-
-    def post_process_score(self, scheduled_logs):
-        total_cpu_hour = 0
-        if self.job_score_type == 3:
-            total_cpu_hour = (self.current_timestamp - self.loads[self.start].submit_time) * self.loads.max_procs
-
-        for i in scheduled_logs:
-            if self.job_score_type in [0, 1, 2, 4]:
-                scheduled_logs[i] /= self.num_job_in_batch
-            elif self.job_score_type == 3:
-                scheduled_logs[i] /= total_cpu_hour
-            else:
-                raise NotImplementedError("Invalid job_score_type")
 
     def reset_env_component(self):
         # print("start", self.start)
@@ -394,7 +370,7 @@ class HPCEnv(gym.Env, ABC):
         # print(self.current_timestamp)
         job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
         self.running_jobs.append(job_for_scheduling)
-        score = self.job_score(job_for_scheduling)  # calculated reward
+        score = self.scorer.job_score(job_for_scheduling)  # calculated reward
         scheduled_logs[job_for_scheduling.job_id] = score
         self.job_queue.remove(job_for_scheduling)
 
@@ -415,7 +391,8 @@ class HPCEnv(gym.Env, ABC):
             if not not_empty:
                 break
 
-        self.post_process_score(scheduled_logs)
+        self.scorer.post_process_score(scheduled_logs, self.num_job_in_batch,
+                                       self.current_timestamp, self.loads[self.start], self.loads.max_procs)
         # if f:
         #     print((time.time()-start_time)/num_total, num_total)
         # reset again
@@ -454,171 +431,120 @@ class HPCEnv(gym.Env, ABC):
 
         return vector
 
-    def build_observation(self):
-        vector = np.zeros(MAX_QUEUE_SIZE * JOB_FEATURES, dtype=float)
-        self.job_queue.sort(key=lambda j: fcfs_score(j))
-        self.visible_jobs = []
-        for i in range(0, MAX_QUEUE_SIZE):
-            if i < len(self.job_queue):
-                self.visible_jobs.append(self.job_queue[i])
-            else:
+    def select_jobs_by_score(self, score_func):
+        self.job_queue.sort(key=lambda j: score_func(j))
+        return self.job_queue[:MAX_QUEUE_SIZE]
+
+    def build_job_features(self, job):
+        submit_time = job.submit_time
+        request_processors = job.request_number_of_processors
+        request_time = job.request_time
+        # run_time = job.run_time
+        wait_time = self.current_timestamp - submit_time
+
+        # make sure that larger value is better.
+        normalized_wait_time = min(float(wait_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
+        normalized_run_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - 1e-5)
+        normalized_request_nodes = min(float(request_processors) / float(self.loads.max_procs), 1.0 - 1e-5)
+
+        '''
+        @ddai: part 2 of OPTIMIZE_OBSV
+        earliest_start_time = 1
+        for fp, ts in free_processors_pair:
+            if request_processors < fp:
+                earliest_start_time = ts
                 break
-        self.visible_jobs.sort(key=lambda j: fcfs_score(j))
+        normalized_earliest_start_time = min(float(earliest_start_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
+        '''
+
+        # add extra parameters, include "Requested Memory", "User Id", "Groupd Id", "Exectuable Id",
+        # if its value does not exist in the trace (-1), we set it to 1 by default.
+        if job.request_memory == -1:
+            normalized_request_memory = 1
+        else:
+            normalized_request_memory = min(float(job.request_memory) / float(self.loads.max_requested_memory),
+                                            1.0 - 1e-5)
+
+        if job.user_id == -1:
+            normalized_user_id = 1
+        else:
+            normalized_user_id = min(float(job.user_id) / float(self.loads.max_user_id), 1.0 - 1e-5)
+
+        if job.group_id == -1:
+            normalized_group_id = 1
+        else:
+            normalized_group_id = min(float(job.group_id) / float(self.loads.max_group_id), 1.0 - 1e-5)
+
+        if job.executable_number == -1:
+            normalized_executable_id = 1
+        else:
+            normalized_executable_id = min(
+                float(job.executable_number) / float(self.loads.max_executable_number), 1.0 - 1e-5)
+
+        if self.cluster.fits(job):
+            can_schedule_now = 1.0 - 1e-5
+        else:
+            can_schedule_now = 1e-5
+        return [job, normalized_wait_time, normalized_run_time, normalized_request_nodes,
+                normalized_request_memory, normalized_user_id, normalized_group_id,
+                normalized_executable_id, can_schedule_now]
+
+    @staticmethod
+    def build_skip_features(pivot):
+        if pivot:
+            return [None, 1, 1, 1, 1, 1, 1, 1, 1]
+        else:
+            return [None, 1, 1, 1, 1, 1, 1, 1, 0]
+
+    def build_observation(self):
+        self.job_queue.sort(key=lambda j: self.scorer.fcfs_score(j))
+        self.visible_jobs = self.job_queue[:MAX_QUEUE_SIZE]
+
         if self.shuffle:
             self.np_random.shuffle(self.visible_jobs)
 
         # @ddai: optimize the observable jobs
         self.visible_jobs = []
         if len(self.job_queue) <= MAX_QUEUE_SIZE:
-            for i in range(0, len(self.job_queue)):
-                self.visible_jobs.append(self.job_queue[i])
+            self.visible_jobs = self.job_queue[:len(self.job_queue)]
         else:
-            visible_f1 = []
-            f1_index = 0
-            self.job_queue.sort(key=lambda _job: f1_score(_job))
-            for i in range(0, MAX_QUEUE_SIZE):
-                visible_f1.append(self.job_queue[i])
+            visible_jobs_sets = [
+                self.select_jobs_by_score(self.scorer.f1_score),
+                self.select_jobs_by_score(self.scorer.f2_score),
+                self.select_jobs_by_score(self.scorer.sjf_score),
+                self.select_jobs_by_score(self.scorer.smallest_score),
+            ]
 
-            visible_f2 = []
-            f2_index = 0
-            self.job_queue.sort(key=lambda _job: f2_score(_job))
-            for i in range(0, MAX_QUEUE_SIZE):
-                visible_f2.append(self.job_queue[i])
-
-            visible_sjf = []
-            sjf_index = 0
-            self.job_queue.sort(key=lambda _job: sjf_score(_job))
-            for i in range(0, MAX_QUEUE_SIZE):
-                visible_sjf.append(self.job_queue[i])
-
-            visible_small = []
-            small_index = 0
-            self.job_queue.sort(key=lambda _job: smallest_score(_job))
-            for i in range(0, MAX_QUEUE_SIZE):
-                visible_small.append(self.job_queue[i])
-
-            visible_random = []
-            random_index = 0
             shuffled = list(self.job_queue)
             self.np_random.shuffle(shuffled)
-            for i in range(0, MAX_QUEUE_SIZE):
-                visible_random.append(shuffled[i])
+            visible_jobs_sets.append(shuffled[:MAX_QUEUE_SIZE])
+
+            print(visible_jobs_sets)
 
             index = 0
-
             while index < MAX_QUEUE_SIZE:
-                # f1_job = visible_f1[f1_index]
-                f1_index += 1
-                # f2_job = visible_f2[f2_index]
-                f2_index += 1
-                sjf_job = visible_sjf[sjf_index]
-                sjf_index += 1
-                small_job = visible_small[small_index]
-                small_index += 1
-                random_job = visible_sjf[random_index]
-                random_index += 1
-                # if (not f1_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
-                #    self.visible_jobs.append(f1_job)
-                #    index += 1
-                # if (not f2_job in self.visible_jobs) and index < MAX_QUEUE_SIZE:
-                #    self.visible_jobs.append(f2_job)
-                #    index += 1
-                if (sjf_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
-                    self.visible_jobs.append(sjf_job)
-                    index += 1
-                if (small_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
-                    self.visible_jobs.append(small_job)
-                    index += 1
-                if (random_job not in self.visible_jobs) and index < MAX_QUEUE_SIZE:
-                    self.visible_jobs.append(random_job)
-                    index += 1
-
-        '''
-        
-        @ddai: OPTIMIZE_OBSV. This time, we calculate the earliest start time of each job and expose that to the 
-        RL agent. if it is 0, then the job can start now, if it is near 1, that means it will have to wait for a 
-        really long time to start. The earliest start time is calculated based on current resources and the running 
-        jobs. It assumes no more jobs will be scheduled.
-
-        # calculate the free resources at each outstanding ts
-        free_processors_pair = []
-        free_processors = (self.cluster.free_node * self.cluster.num_procs_per_node)
-        free_processors_pair.append((free_processors, 0))
-
-        self.running_jobs.sort(key=lambda running_job: (running_job.scheduled_time + running_job.run_time))
-        for rj in self.running_jobs:
-            free_processors += rj.request_number_of_processors
-            free_processors_pair.append((free_processors, (rj.scheduled_time + rj.run_time - self.current_timestamp)))
-        '''
-
-        self.pairs = []
-        add_skip = False
-        for i in range(0, MAX_QUEUE_SIZE):
-            if i < len(self.visible_jobs) and i < MAX_QUEUE_SIZE:
-                job = self.visible_jobs[i]
-                submit_time = job.submit_time
-                request_processors = job.request_number_of_processors
-                request_time = job.request_time
-                # run_time = job.run_time
-                wait_time = self.current_timestamp - submit_time
-
-                # make sure that larger value is better.
-                normalized_wait_time = min(float(wait_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
-                normalized_run_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - 1e-5)
-                normalized_request_nodes = min(float(request_processors) / float(self.loads.max_procs), 1.0 - 1e-5)
-
-                '''
-                @ddai: part 2 of OPTIMIZE_OBSV
-                earliest_start_time = 1
-                for fp, ts in free_processors_pair:
-                    if request_processors < fp:
-                        earliest_start_time = ts
+                for visible_jobs in visible_jobs_sets:
+                    if index >= MAX_QUEUE_SIZE:
                         break
-                normalized_earliest_start_time = min(float(earliest_start_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
-                '''
+                    job = visible_jobs[index]
+                    if job not in self.visible_jobs:
+                        self.visible_jobs.append(job)
+                        index += 1
 
-                # add extra parameters, include "Requested Memory", "User Id", "Groupd Id", "Exectuable Id",
-                # if its value does not exist in the trace (-1), we set it to 1 by default.
-                if job.request_memory == -1:
-                    normalized_request_memory = 1
-                else:
-                    normalized_request_memory = min(float(job.request_memory) / float(self.loads.max_requested_memory),
-                                                    1.0 - 1e-5)
+        # Code for OPTIMIZE_OBSV omitted for brevity
 
-                if job.user_id == -1:
-                    normalized_user_id = 1
-                else:
-                    normalized_user_id = min(float(job.user_id) / float(self.loads.max_user_id), 1.0 - 1e-5)
-
-                if job.group_id == -1:
-                    normalized_group_id = 1
-                else:
-                    normalized_group_id = min(float(job.group_id) / float(self.loads.max_group_id), 1.0 - 1e-5)
-
-                if job.executable_number == -1:
-                    normalized_executable_id = 1
-                else:
-                    normalized_executable_id = min(
-                        float(job.executable_number) / float(self.loads.max_executable_number), 1.0 - 1e-5)
-
-                if self.cluster.fits(job):
-                    can_schedule_now = 1.0 - 1e-5
-                else:
-                    can_schedule_now = 1e-5
-                self.pairs.append([job, normalized_wait_time, normalized_run_time, normalized_request_nodes,
-                                   normalized_request_memory, normalized_user_id, normalized_group_id,
-                                   normalized_executable_id, can_schedule_now])
-
-            elif self.skip and not add_skip:  # the next job is skip
-                add_skip = True
-                if self.pivot_job:
-                    self.pairs.append([None, 1, 1, 1, 1, 1, 1, 1, 1])
-                else:
-                    self.pairs.append([None, 1, 1, 1, 1, 1, 1, 1, 0])
+        vector = np.zeros(MAX_QUEUE_SIZE * JOB_FEATURES, dtype=float)
+        self.pairs = []
+        for i in range(MAX_QUEUE_SIZE):
+            if i < len(self.visible_jobs):
+                job = self.visible_jobs[i]
+                self.pairs.append(self.build_job_features(job))
+            elif self.skip and not self.pairs:
+                self.pairs.append(self.build_skip_features(self.pivot_job))
             else:
-                self.pairs.append([None, 0, 1, 1, 1, 1, 1, 1, 0])
+                self.pairs.append(self.build_skip_features(None))
 
-        for i in range(0, MAX_QUEUE_SIZE):
+        for i in range(MAX_QUEUE_SIZE):
             vector[i * JOB_FEATURES:(i + 1) * JOB_FEATURES] = self.pairs[i][1:]
 
         return vector
@@ -639,7 +565,7 @@ class HPCEnv(gym.Env, ABC):
         job.scheduled_time = self.current_timestamp
         job.allocated_machines = self.cluster.allocate(job)
         self.running_jobs.append(job)
-        score = self.job_score(job)  # calculated reward
+        score = self.scorer.job_score(job)  # calculated reward
         self.scheduled_rl[job.job_id] = score
         self.job_queue.remove(job)  # remove the job from job queue
 
@@ -671,7 +597,7 @@ class HPCEnv(gym.Env, ABC):
                 break
 
         while not self.cluster.fits(job):
-            self.job_queue.sort(key=lambda _j: fcfs_score(_j))
+            self.job_queue.sort(key=lambda _j: self.scorer.fcfs_score(_j))
             job_queue_iter_copy = list(self.job_queue)
             for _j in job_queue_iter_copy:
                 if self.cluster.fits(_j) and (self.current_timestamp + _j.request_time) < earliest_start_time:
@@ -756,7 +682,7 @@ class HPCEnv(gym.Env, ABC):
         job_for_scheduling.scheduled_time = self.current_timestamp
         job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
         self.running_jobs.append(job_for_scheduling)
-        score = self.job_score(job_for_scheduling)  # calculated reward
+        score = self.scorer.job_score(job_for_scheduling)  # calculated reward
         self.scheduled_rl[job_for_scheduling.job_id] = score
         self.job_queue.remove(job_for_scheduling)  # remove the job from job queue
 
@@ -782,7 +708,8 @@ class HPCEnv(gym.Env, ABC):
             obs = self.build_observation()
             return [obs, 0, False, 0, 0, 0]
         else:
-            self.post_process_score(self.scheduled_rl)
+            self.scorer.post_process_score(self.scheduled_rl, self.num_job_in_batch,
+                                           self.current_timestamp, self.loads[self.start], self.loads.max_procs)
             rl_total = sum(self.scheduled_rl.values())
             best_total = min(self.scheduled_scores)
             sjf = self.scheduled_scores[0]
@@ -805,6 +732,7 @@ class HPCEnv(gym.Env, ABC):
             obs = self.build_observation()
             return [obs, 0, False, None]
         else:
-            self.post_process_score(self.scheduled_rl)
+            self.scorer.post_process_score(self.scheduled_rl, self.num_job_in_batch,
+                                           self.current_timestamp, self.loads[self.start], self.loads.max_procs)
             rl_total = sum(self.scheduled_rl.values())
             return [None, rl_total, True, None]
