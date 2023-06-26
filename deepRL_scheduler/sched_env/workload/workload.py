@@ -1,6 +1,6 @@
 import sys
 
-from .job import Job
+from deepRL_scheduler.sched_env.job import Job
 
 
 class Workloads:

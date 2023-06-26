@@ -1,5 +1,5 @@
 import os
-from sched_env_v2.scheduler_env import HPCEnv
+from sched_env.scheduler_env import HPCEnv
 
 if __name__ == '__main__':
     import argparse

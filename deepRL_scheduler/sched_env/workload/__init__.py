@@ -3,18 +3,11 @@
 
 """workload - Package for generators of load for a cluster.
 
-Supports generative workloads, based on probability distributions, and
-trace-based workloads in the Standard Workload Format.
+Supports trace-based workloads in the Standard Workload Format.
 """
 
-from .base import WorkloadGenerator
-from .distribution import BinomialWorkloadGenerator
-from .distribution import DistributionalWorkloadGenerator
-from .trace import SwfGenerator
+from .workload import Workloads
 
 __all__ = [
-    'WorkloadGenerator',
-    'DistributionalWorkloadGenerator',
-    'BinomialWorkloadGenerator',
-    'SwfGenerator',
+    'Workloads',
 ]
