@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from sched_env.scheduler_env import HPCEnv
+from deepRL_scheduler.sched_env.env import HPCEnv
 
 if __name__ == '__main__':
     import argparse
@@ -20,4 +20,3 @@ if __name__ == '__main__':
     for i in range(5000):
         action = env.action_space.sample()
         state, rwd, done, rwd2, sjf, f1 = env.step(action)
-        print(state.shape)

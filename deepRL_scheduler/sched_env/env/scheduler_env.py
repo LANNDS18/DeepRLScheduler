@@ -9,10 +9,10 @@ import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
-from .cluster import Cluster
-from .job import Job
-from .job_scorer import JobScorer
-from .workload import Workloads
+from ..cluster import Cluster
+from ..job import Job
+from ..job_scorer import JobScorer
+from ..workload import Workloads
 
 MAX_QUEUE_SIZE = 128
 MLP_SIZE = 256
@@ -62,8 +62,10 @@ class HPCEnv(gym.Env, ABC):
         self.num_job_in_batch = 0
         self.start_idx_last_reset = 0
 
+        # sub-components
         self.loads = None
         self.cluster = None
+        self.scorer = JobScorer(job_score_type)
 
         self.bsld_algo_dict = {}
         self.scheduled_rl = {}
@@ -80,8 +82,6 @@ class HPCEnv(gym.Env, ABC):
         # 0: Average bounded slowdown, 1: Average waiting time
         # 2: Average turnaround time, 3: Resource utilization
         self.job_score_type = job_score_type
-
-        self.scorer = JobScorer(job_score_type)
 
         self.batch_job_slice = batch_job_slice
 
@@ -241,34 +241,6 @@ class HPCEnv(gym.Env, ABC):
         print(":ENV:\tScheduled Scores:", self.scheduled_scores)
 
         return self.build_observation(), self.build_critic_observation()
-
-    def reset_for_test(self, num):
-
-        self.reset_env_component()
-
-        self.current_timestamp = 0
-        self.start = 0
-        self.next_arriving_job_idx = 0
-        self.last_job_in_batch = 0
-        self.num_job_in_batch = 0
-        self.scheduled_rl = {}
-        self.penalty = 0
-        self.pivot_job = False
-        self.scheduled_scores = []
-
-        job_sequence_size = num
-        assert self.batch_job_slice == 0 or self.batch_job_slice >= job_sequence_size
-        if self.batch_job_slice == 0:
-            self.start = self.np_random.randint(job_sequence_size, (self.loads.size() - job_sequence_size - 1))
-        else:
-            self.start = self.np_random.randint(job_sequence_size, (self.batch_job_slice - job_sequence_size - 1))
-        # self.start = start
-        self.start_idx_last_reset = self.start
-        self.num_job_in_batch = job_sequence_size
-        self.last_job_in_batch = self.start + self.num_job_in_batch
-        self.current_timestamp = self.loads[self.start].submit_time
-        self.job_queue.append(self.loads[self.start])
-        self.next_arriving_job_idx = self.start + 1
 
     def skip_for_resources_greedy(self, job):
         """
@@ -519,8 +491,6 @@ class HPCEnv(gym.Env, ABC):
             self.np_random.shuffle(shuffled)
             visible_jobs_sets.append(shuffled[:MAX_QUEUE_SIZE])
 
-            print(visible_jobs_sets)
-
             index = 0
             while index < MAX_QUEUE_SIZE:
                 for visible_jobs in visible_jobs_sets:
@@ -718,21 +688,3 @@ class HPCEnv(gym.Env, ABC):
             rwd = -rl_total
             return [None, rwd, True, rwd2, sjf, f1]
 
-    def step_for_test(self, a):
-        job_for_scheduling = self.pairs[a][0]
-
-        if not job_for_scheduling:
-            # print("SKIP", end=" ")
-            done, _ = self.skip_schedule()
-        else:
-            job_for_scheduling = self.pairs[a][0]
-            done = self.schedule(job_for_scheduling)
-
-        if not done:
-            obs = self.build_observation()
-            return [obs, 0, False, None]
-        else:
-            self.scorer.post_process_score(self.scheduled_rl, self.num_job_in_batch,
-                                           self.current_timestamp, self.loads[self.start], self.loads.max_procs)
-            rl_total = sum(self.scheduled_rl.values())
-            return [None, rl_total, True, None]
