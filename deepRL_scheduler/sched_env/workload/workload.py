@@ -8,7 +8,7 @@ from deepRL_scheduler.sched_env.job import Job
 
 class Workloads:
 
-    def __init__(self, path):
+    def __init__(self):
         self.all_jobs = []
         self.max = 0
         self.max_exec_time = 0
@@ -22,6 +22,11 @@ class Workloads:
         self.max_job_id = 0
         self.max_nodes = 0
         self.max_procs = 0
+
+    def size(self):
+        return len(self.all_jobs)
+
+    def parse_swf(self, path):
 
         with open(path) as fp:
             for line in fp:
@@ -66,9 +71,6 @@ class Workloads:
               f"max execution time: {self.max_exec_time}.")
 
         self.all_jobs.sort(key=lambda job: job.job_id)
-
-    def size(self):
-        return len(self.all_jobs)
 
     def reset(self):
         for job in self.all_jobs:

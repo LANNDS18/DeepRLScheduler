@@ -60,7 +60,7 @@ class TestEnv(HPCEnv, ABC):
             obs = self.build_observation()
             return [obs, 0, False, None]
         else:
-            self.scorer.post_process_score(self.scheduled_rl, self.num_job_in_batch,
-                                           self.current_timestamp, self.loads[self.start], self.loads.max_procs)
+            self.scheduled_rl = self.scorer.post_process_matrices(self.scheduled_rl, self.num_job_in_batch,
+                                                                  self.current_timestamp, self.loads[self.start], self.loads.max_procs)
             rl_total = sum(self.scheduled_rl.values())
             return [None, rl_total, True, None]

@@ -40,8 +40,6 @@ class HPCEnv(gym.Env, ABC):
 
         super(HPCEnv, self).__init__()
 
-        print("Initialize Simple HPC Env")
-
         self.penalty_job_score = None
 
         self.action_space = spaces.Discrete(MAX_QUEUE_SIZE)
@@ -63,8 +61,10 @@ class HPCEnv(gym.Env, ABC):
         self.start_idx_last_reset = 0
 
         # sub-components
-        self.loads = None
+        self.loads = Workloads()
         self.cluster = None
+        # 0: Average bounded slowdown, 1: Average waiting time
+        # 2: Average turnaround time, 3: Resource utilization
         self.scorer = JobScorer(job_score_type)
 
         self.bsld_algo_dict = {}
@@ -78,10 +78,6 @@ class HPCEnv(gym.Env, ABC):
         self.shuffle = shuffle
         self.back_fill = back_fill
         self.skip = skip
-
-        # 0: Average bounded slowdown, 1: Average waiting time
-        # 2: Average turnaround time, 3: Resource utilization
-        self.job_score_type = job_score_type
 
         self.batch_job_slice = batch_job_slice
 
@@ -97,7 +93,7 @@ class HPCEnv(gym.Env, ABC):
 
     def load_job_trace(self, workload_file=''):
         print(f":ENV:\tloading workloads from dataset: {workload_file}")
-        self.loads = Workloads(workload_file)
+        self.loads.parse_swf(workload_file)
         self.cluster = Cluster(self.loads.max_nodes, self.loads.max_procs / self.loads.max_nodes)
         self.penalty_job_score = JOB_SEQUENCE_SIZE * self.loads.max_exec_time / 10
 
@@ -295,7 +291,7 @@ class HPCEnv(gym.Env, ABC):
                         _j.scheduled_time = self.current_timestamp
                         _j.allocated_machines = self.cluster.allocate(_j)
                         self.running_jobs.append(_j)
-                        score = self.scorer.job_score(_j)  # calculated reward
+                        score = self.scorer.scheduling_matrices(_j)  # calculated reward
                         scheduled_logs[_j.job_id] = score
                         self.job_queue.remove(_j)  # remove the job from job queue
 
@@ -342,7 +338,7 @@ class HPCEnv(gym.Env, ABC):
         # print(self.current_timestamp)
         job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
         self.running_jobs.append(job_for_scheduling)
-        score = self.scorer.job_score(job_for_scheduling)  # calculated reward
+        score = self.scorer.scheduling_matrices(job_for_scheduling)  # calculated reward
         scheduled_logs[job_for_scheduling.job_id] = score
         self.job_queue.remove(job_for_scheduling)
 
@@ -351,7 +347,7 @@ class HPCEnv(gym.Env, ABC):
         return not_empty, scheduled_logs
 
     def schedule_curr_sequence_reset(self, score_fn):
-        # schedule the sequence of jobs using heuristic algorithm. 
+        # schedule the sequence of jobs using heuristic algorithm.
         scheduled_logs = {}
         # f = False
         # if score_fn.__name__ == "sjf_score":
@@ -363,8 +359,9 @@ class HPCEnv(gym.Env, ABC):
             if not not_empty:
                 break
 
-        self.scorer.post_process_score(scheduled_logs, self.num_job_in_batch,
-                                       self.current_timestamp, self.loads[self.start], self.loads.max_procs)
+        scheduled_logs = self.scorer.post_process_matrices(scheduled_logs, self.num_job_in_batch,
+                                                           self.current_timestamp, self.loads[self.start],
+                                                           self.loads.max_procs)
         # if f:
         #     print((time.time()-start_time)/num_total, num_total)
         # reset again
@@ -535,7 +532,7 @@ class HPCEnv(gym.Env, ABC):
         job.scheduled_time = self.current_timestamp
         job.allocated_machines = self.cluster.allocate(job)
         self.running_jobs.append(job)
-        score = self.scorer.job_score(job)  # calculated reward
+        score = self.scorer.scheduling_matrices(job)  # calculated reward
         self.scheduled_rl[job.job_id] = score
         self.job_queue.remove(job)  # remove the job from job queue
 
@@ -652,7 +649,7 @@ class HPCEnv(gym.Env, ABC):
         job_for_scheduling.scheduled_time = self.current_timestamp
         job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
         self.running_jobs.append(job_for_scheduling)
-        score = self.scorer.job_score(job_for_scheduling)  # calculated reward
+        score = self.scorer.scheduling_matrices(job_for_scheduling)  # calculated reward
         self.scheduled_rl[job_for_scheduling.job_id] = score
         self.job_queue.remove(job_for_scheduling)  # remove the job from job queue
 
@@ -678,8 +675,9 @@ class HPCEnv(gym.Env, ABC):
             obs = self.build_observation()
             return [obs, 0, False, 0, 0, 0]
         else:
-            self.scorer.post_process_score(self.scheduled_rl, self.num_job_in_batch,
-                                           self.current_timestamp, self.loads[self.start], self.loads.max_procs)
+            self.scheduled_rl = self.scorer.post_process_matrices(self.scheduled_rl, self.num_job_in_batch,
+                                                                  self.current_timestamp, self.loads[self.start],
+                                                                  self.loads.max_procs)
             rl_total = sum(self.scheduled_rl.values())
             best_total = min(self.scheduled_scores)
             sjf = self.scheduled_scores[0]
@@ -687,4 +685,3 @@ class HPCEnv(gym.Env, ABC):
             rwd2 = (best_total - rl_total)
             rwd = -rl_total
             return [None, rwd, True, rwd2, sjf, f1]
-

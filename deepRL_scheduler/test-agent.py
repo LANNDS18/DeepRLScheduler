@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from deepRL_scheduler.sched_env.env import HPCEnv
+from sched_env.env import HPCEnv
 
 if __name__ == '__main__':
     import argparse
@@ -13,7 +13,7 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = HPCEnv(batch_job_slice=700, build_sjf=False, back_fill=False, seed=0)
+    env = HPCEnv(batch_job_slice=700, build_sjf=True, back_fill=False, seed=0)
     env.load_job_trace(workload_file=workload_file)
     env.reset()
 

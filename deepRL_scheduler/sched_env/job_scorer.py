@@ -8,13 +8,13 @@ class JobScorer:
     def __init__(self, job_score_type):
         self.job_score_type = job_score_type
 
-    def job_score(self, job):
+    def scheduling_matrices(self, job):
         score_calculations = {
-            0: self.average_bounded_slowdown,
-            1: self.average_waiting_time,
-            2: self.average_turnaround_time,
-            3: self.resource_utilization,
-            4: self.average_slowdown,
+            0: self._average_bounded_slowdown,
+            1: self._average_waiting_time,
+            2: self._average_turnaround_time,
+            3: self._resource_utilization,
+            4: self._average_slowdown,
         }
 
         try:
@@ -24,18 +24,17 @@ class JobScorer:
 
         return calculation(job)
 
-    def post_process_score(self, scheduled_logs, num_job_in_batch, current_timestamp, start_job, max_procs):
-        total_cpu_hour = 0
-        if self.job_score_type == 3:
-            total_cpu_hour = (current_timestamp - start_job.submit_time) * max_procs
+    def post_process_matrices(self, scheduled_logs, num_job_in_batch, current_timestamp, start_job, max_procs):
 
         for i in scheduled_logs:
             if self.job_score_type in [0, 1, 2, 4]:
                 scheduled_logs[i] /= num_job_in_batch
             elif self.job_score_type == 3:
-                scheduled_logs[i] /= total_cpu_hour
+                scheduled_logs[i] /= (current_timestamp - start_job.submit_time) * max_procs
             else:
                 raise NotImplementedError("Invalid job_score_type")
+
+        return scheduled_logs
 
     @staticmethod
     def f1_score(job):
@@ -76,22 +75,22 @@ class JobScorer:
         return submit_time
 
     @staticmethod
-    def average_bounded_slowdown(job):
+    def _average_bounded_slowdown(job):
         runtime = max(job.run_time, 10)
         return max(1.0, (job.scheduled_time - job.submit_time + job.run_time) / runtime)
 
     @staticmethod
-    def average_waiting_time(job):
+    def _average_waiting_time(job):
         return job.scheduled_time - job.submit_time
 
     @staticmethod
-    def average_turnaround_time(job):
+    def _average_turnaround_time(job):
         return job.scheduled_time - job.submit_time + job.run_time
 
     @staticmethod
-    def resource_utilization(job):
+    def _resource_utilization(job):
         return -job.run_time * job.request_number_of_processors
 
     @staticmethod
-    def average_slowdown(job):
+    def _average_slowdown(job):
         return (job.scheduled_time - job.submit_time + job.run_time) / job.run_time
