@@ -8,7 +8,7 @@
 **Meeting Purpose:**
 Discuss background chapter writing and the implementation of traces generator.
 
-**Meeting Location:** MS Teams
+**Meeting Location:** EPCC
 
 ## Attendees
 
