@@ -9,10 +9,10 @@ import numpy as np
 from gym import spaces
 from gym.utils import seeding
 
-from ..cluster import Cluster
-from ..job import Job
-from ..job_scorer import JobScorer
-from ..workload import Workloads
+from .cluster import Cluster
+from .job import Job
+from .job_scorer import JobScorer
+from .workload import Workloads
 
 MAX_QUEUE_SIZE = 128
 MLP_SIZE = 256
@@ -28,7 +28,7 @@ JOB_SEQUENCE_SIZE = 256
 SKIP_TIME = 360  # skip 60 seconds
 
 
-class HPCEnv(gym.Env, ABC):
+class Scheduler(gym.Env, ABC):
     def __init__(self,
                  shuffle=False,
                  back_fill=False,
@@ -38,7 +38,7 @@ class HPCEnv(gym.Env, ABC):
                  build_sjf=False,
                  seed=0):
 
-        super(HPCEnv, self).__init__()
+        super(Scheduler).__init__()
 
         self.penalty_job_score = None
 
@@ -96,52 +96,7 @@ class HPCEnv(gym.Env, ABC):
         self.loads.parse_swf(workload_file)
         self.cluster = Cluster(self.loads.max_nodes, self.loads.max_procs / self.loads.max_nodes)
         self.penalty_job_score = JOB_SEQUENCE_SIZE * self.loads.max_exec_time / 10
-    """
-        if self.build_sjf:
-            # this is for trajectory filtering.
-            # calculate SJF scores for all sample sequence and save them here
-            index = 0
-            if self.batch_job_slice == 0:
-                max_index = self.loads.size() - JOB_SEQUENCE_SIZE - 1
 
-            else:
-                max_index = min(self.batch_job_slice, self.loads.size()) - JOB_SEQUENCE_SIZE - 1
-
-            print(f":ENV:\tmax index = {max_index} ... initializing SJF Score Array")
-
-            while index <= max_index:
-                index += 1
-                if index % 100 == 0:
-                    print(f":ENV:\tindex {index}")
-
-                self.reset_env_component()
-
-                self.current_timestamp = 0
-                self.start = 0
-                self.next_arriving_job_idx = 0
-                self.last_job_in_batch = 0
-                self.num_job_in_batch = 0
-                self.scheduled_rl = {}
-                self.penalty = 0
-                self.pivot_job = False
-                self.scheduled_scores = []
-
-                job_sequence_size = JOB_SEQUENCE_SIZE
-                self.pre_workloads = []
-
-                self.start = index
-                self.start_idx_last_reset = self.start
-                self.num_job_in_batch = job_sequence_size
-                self.last_job_in_batch = self.start + self.num_job_in_batch
-                self.current_timestamp = self.loads[self.start].submit_time
-                self.job_queue.append(self.loads[self.start])
-                self.next_arriving_job_idx = self.start + 1
-
-                self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
-
-                self.sjf_scores.append(sum(self.schedule_curr_sequence_reset(self.scorer.sjf_score).values()))
-
-    """
     @staticmethod
     def build_observation_space():
         # todo: represent the cluster into correct machine state
@@ -651,5 +606,4 @@ class HPCEnv(gym.Env, ABC):
             # f1 = self.scheduled_scores[1]
             # rwd2 = (best_total - rl_total)
             rwd = -rl_total
-            # return [None, rwd, True, rwd2, sjf, f1]
             return [None, rwd, True, None, None, None]
