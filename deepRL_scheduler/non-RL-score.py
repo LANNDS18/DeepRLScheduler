@@ -9,6 +9,8 @@ from sched_env.job_scorer import JobScorer
 def schedule_curr_sequence_reset(_env, score_fn):
     """schedule the sequence of jobs using heuristic algorithm."""
 
+    _env.reset()
+
     _env.heuristic_reset()
     scheduled_logs = {}
 
