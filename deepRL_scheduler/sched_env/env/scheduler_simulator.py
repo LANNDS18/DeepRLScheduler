@@ -8,7 +8,7 @@ from gym.utils import seeding
 
 from ..cluster import Cluster
 from ..job import Job
-from ..job_scorer import JobScorer
+from ..scorer import ScheduleScorer
 from ..workload import Workloads
 
 from .env_conf import *
@@ -44,7 +44,7 @@ class HPCSchedulingSimulator(ABC):
         self.cluster = None
         # 0: Average bounded slowdown, 1: Average waiting time
         # 2: Average turnaround time, 3: Resource utilization
-        self.scorer = JobScorer(job_score_type)
+        self.scorer = ScheduleScorer(job_score_type)
 
         self.bsld_algo_dict = {}
         self.scheduled_rl = {}

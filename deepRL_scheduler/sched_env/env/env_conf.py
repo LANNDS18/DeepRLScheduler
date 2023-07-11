@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 MAX_QUEUE_SIZE = 128
 MLP_SIZE = 256
 

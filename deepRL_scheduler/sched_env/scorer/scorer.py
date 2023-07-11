@@ -4,7 +4,7 @@
 import numpy as np
 
 
-class JobScorer:
+class ScheduleScorer:
     def __init__(self, job_score_type):
         self.job_score_type = job_score_type
 

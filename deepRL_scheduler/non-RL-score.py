@@ -3,7 +3,7 @@
 
 import os
 from sched_env.env import TestEnv
-from sched_env.job_scorer import JobScorer
+from sched_env.scorer import ScheduleScorer
 
 
 def schedule_curr_sequence_reset(_env, score_fn):
@@ -40,8 +40,8 @@ if __name__ == '__main__':
     env = TestEnv(batch_job_slice=700, back_fill=False, seed=0)
     env.load_job_trace(workload_file=workload_file)
 
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.sjf_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.fcfs_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.smallest_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.f1_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.sjf_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.fcfs_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.smallest_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.f1_score).values()))
 
