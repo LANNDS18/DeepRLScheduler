@@ -3,20 +3,27 @@
 
 from abc import ABC
 
-from .scheduler_env import HPCEnv
+from .gym_env import GymSchedulerEnv
 
 
-class TestEnv(HPCEnv, ABC):
+class TestEnv(GymSchedulerEnv, ABC):
     def __init__(self,
                  shuffle=False,
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
                  batch_job_slice=0,
-                 build_sjf=False,
                  seed=0):
 
-        super(HPCEnv, self).__init__(shuffle, back_fill, skip, job_score_type, batch_job_slice, build_sjf, seed)
+        super(TestEnv, self).__init__()
+
+        GymSchedulerEnv.__init__(self,
+                                 shuffle=shuffle,
+                                 back_fill=back_fill,
+                                 skip=skip,
+                                 job_score_type=job_score_type,
+                                 batch_job_slice=batch_job_slice,
+                                 seed=seed)
 
     def reset_for_test(self, num):
 
@@ -60,6 +67,41 @@ class TestEnv(HPCEnv, ABC):
             return [obs, 0, False, None]
         else:
             self.scheduled_rl = self.scorer.post_process_matrices(self.scheduled_rl, self.num_job_in_batch,
-                                                                  self.current_timestamp, self.loads[self.start], self.loads.max_procs)
+                                                                  self.current_timestamp, self.loads[self.start],
+                                                                  self.loads.max_procs)
             rl_total = sum(self.scheduled_rl.values())
             return [None, rl_total, True, None]
+
+    def heuristic_reset(self):
+        self.reset_env_component()
+
+        self.current_timestamp = self.loads[self.start].submit_time
+        self.job_queue.append(self.loads[self.start])
+        self.last_job_in_batch = self.start + self.num_job_in_batch
+        self.next_arriving_job_idx = self.start + 1
+
+        self.refill_pre_workloads()
+
+    def heuristic_step(self, score_fn, scheduled_logs):
+
+        self.job_queue.sort(key=lambda j: score_fn(j))
+        job_for_scheduling = self.job_queue[0]
+
+        if not self.cluster.fits(job_for_scheduling):
+            if self.back_fill:
+                scheduled_logs = self.forward_single_step_resources_back_fill(job_for_scheduling, scheduled_logs)
+            else:
+                self.skip_for_resources_greedy(job_for_scheduling)
+
+        assert job_for_scheduling.scheduled_time == -1  # this job should never be scheduled before.
+        job_for_scheduling.scheduled_time = self.current_timestamp
+        # print(self.current_timestamp)
+        job_for_scheduling.allocated_machines = self.cluster.allocate(job_for_scheduling)
+        self.running_jobs.append(job_for_scheduling)
+        score = self.scorer.scheduling_matrices(job_for_scheduling)  # calculated reward
+        scheduled_logs[job_for_scheduling.job_id] = score
+        self.job_queue.remove(job_for_scheduling)
+
+        not_empty = self.process_job_queue()
+
+        return not_empty, scheduled_logs

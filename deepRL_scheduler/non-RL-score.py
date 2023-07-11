@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from sched_env.env import HPCEnv
+from sched_env.env import TestEnv
 from sched_env.job_scorer import JobScorer
 
 
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = HPCEnv(batch_job_slice=700, back_fill=False, seed=0)
+    env = TestEnv(batch_job_slice=700, back_fill=False, seed=0)
     env.load_job_trace(workload_file=workload_file)
 
     print(sum(schedule_curr_sequence_reset(env, JobScorer.sjf_score).values()))
