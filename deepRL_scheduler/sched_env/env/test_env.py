@@ -50,11 +50,10 @@ class TestEnv(HPCEnv, ABC):
         job_for_scheduling = self.pairs[a][0]
 
         if not job_for_scheduling:
-            # print("SKIP", end=" ")
-            done, _ = self.skip_schedule()
+            done = self.noop_schedule()
         else:
             job_for_scheduling = self.pairs[a][0]
-            done = self.schedule(job_for_scheduling)
+            done = self.check_then_schedule(job_for_scheduling)
 
         if not done:
             obs = self.build_observation()
