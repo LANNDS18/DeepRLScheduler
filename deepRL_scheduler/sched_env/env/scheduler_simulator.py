@@ -16,7 +16,7 @@ from .env_conf import *
 
 class HPCSchedulingSimulator(ABC):
     def __init__(self,
-                 shuffle=False,
+                 workload_file,
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
@@ -53,7 +53,6 @@ class HPCSchedulingSimulator(ABC):
         self.enable_pre_workloads = False
         self.pre_workloads = []
 
-        self.shuffle = shuffle
         self.back_fill = back_fill
         self.skip = skip
 
@@ -62,11 +61,13 @@ class HPCSchedulingSimulator(ABC):
         self.np_random = None
         self.seed(seed)
 
+        self._load_job_trace(workload_file)
+
     def seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
-    def load_job_trace(self, workload_file=''):
+    def _load_job_trace(self, workload_file=''):
         print(f":ENV:\tloading workloads from dataset: {workload_file}")
         self.loads.parse_swf(workload_file)
         self.cluster = Cluster(self.loads.max_nodes, self.loads.max_procs / self.loads.max_nodes)

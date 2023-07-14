@@ -7,9 +7,9 @@ MLP_SIZE = 256
 MAX_WAIT_TIME = 12 * 60 * 60  # assume maximal wait time is 12 hours.
 MAX_RUN_TIME = 12 * 60 * 60  # assume maximal runtime is 12 hours
 
-# each job has three features: wait_time, requested_node, runtime, machine states,
-JOB_FEATURES = 9
+# each job has 11 features
+JOB_FEATURES = 11
 DEBUG = False
 
-JOB_SEQUENCE_SIZE = 256
+JOB_SEQUENCE_SIZE = 10000
 SKIP_TIME = 360  # skip 60 seconds

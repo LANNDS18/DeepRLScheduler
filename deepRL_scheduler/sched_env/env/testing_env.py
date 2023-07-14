@@ -8,17 +8,15 @@ from .gym_env import GymSchedulerEnv
 
 class TestEnv(GymSchedulerEnv, ABC):
     def __init__(self,
-                 shuffle=False,
+                 workload_file,
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
                  batch_job_slice=0,
                  seed=0):
 
-        super(TestEnv, self).__init__()
-
         GymSchedulerEnv.__init__(self,
-                                 shuffle=shuffle,
+                                 workload_file=workload_file,
                                  back_fill=back_fill,
                                  skip=skip,
                                  job_score_type=job_score_type,
@@ -37,7 +35,6 @@ class TestEnv(GymSchedulerEnv, ABC):
         self.scheduled_rl = {}
         self.penalty = 0
         self.pivot_job = False
-        self.scheduled_scores = []
 
         job_sequence_size = num
         assert self.batch_job_slice == 0 or self.batch_job_slice >= job_sequence_size

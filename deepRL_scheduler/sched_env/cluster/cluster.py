@@ -3,6 +3,8 @@
 
 import math
 
+import numpy as np
+
 from typing import Tuple
 from .pool import Pool
 
@@ -17,8 +19,6 @@ class Cluster:
 
         for i in range(self.total_node):
             self.all_nodes.append(Pool(i))
-
-        self.state_list = {}
 
     @property
     def free_resources(self) -> int:
@@ -81,17 +81,12 @@ class Cluster:
             m.reset()
 
     @property
-    def state(self) -> Tuple[dict, int, int]:
+    def state(self) -> np.ndarray:
         """Gets the current state of the cluster as numpy arrays.
 
         Returns:
             Tuple: a pair containing the number of processors used
         """
-        self.state_list = {a.machine_id: a.running_job_id if a.running_job_id else -1 for a in self.all_nodes}
-        processors = (
-            self.state_list,
-            self.free_resources,
-            self.used_node,
-        )
-
-        return processors
+        state_list_values = [a.running_job_id if a.running_job_id else -1 for a in self.all_nodes]
+        state_list = np.array(state_list_values)
+        return state_list

@@ -3,29 +3,44 @@
 
 import os
 from sched_env.env import TestEnv
-from sched_env.scorer import ScheduleScorer
+from sched_env.scorer import Obs_Scorer
 
 
 def schedule_curr_sequence_reset(_env, score_fn):
     """schedule the sequence of jobs using heuristic algorithm."""
 
-    _env.reset()
-    _env.heuristic_reset()
+    obs = _env.reset()
+
     print(f"Current Time Stamp: {_env.current_timestamp}")
+
+    action = 0
+
     scheduled_logs = {}
 
     while True:
-        not_done, scheduled_logs = _env.heuristic_step(score_fn, scheduled_logs)
-        if not not_done:
+
+        state, rwd, done, info = _env.step(action)
+        action = 0
+        score = 0
+
+        for i, ob in enumerate(obs):
+            if score_fn(ob) < score:
+                score = score_fn(ob)
+                action = i
+
+        if done:
+            print("reward", rwd)
+            print("action", action)
             break
 
     scheduled_logs = _env.scorer.post_process_matrices(scheduled_logs, _env.num_job_in_batch,
                                                        _env.current_timestamp, _env.loads[_env.start],
                                                        _env.loads.max_procs)
 
-    print(f"Current Time Stamp: {_env.current_timestamp}")
-    _env.heuristic_reset()
-    return scheduled_logs
+    # print(f"Current Time Stamp: {_env.current_timestamp}")
+    _env.reset()
+
+    return {1: 1}
 
 
 if __name__ == '__main__':
@@ -37,11 +52,9 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = TestEnv(batch_job_slice=700, back_fill=False, seed=0)
-    env.load_job_trace(workload_file=workload_file)
+    env = TestEnv(workload_file=workload_file, batch_job_slice=0, back_fill=False, seed=0)
 
-    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.sjf_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.fcfs_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.smallest_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, ScheduleScorer.f1_score).values()))
-
+    print(sum(schedule_curr_sequence_reset(env, Obs_Scorer.sjf_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, Obs_Scorer.fcfs_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, Obs_Scorer.smallest_score).values()))
+    print(sum(schedule_curr_sequence_reset(env, Obs_Scorer.f1_score).values()))

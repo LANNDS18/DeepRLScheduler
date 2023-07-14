@@ -10,23 +10,12 @@ from abc import ABC
 
 from .scheduler_simulator import HPCSchedulingSimulator
 
-MAX_QUEUE_SIZE = 128
-MLP_SIZE = 256
-
-MAX_WAIT_TIME = 12 * 60 * 60  # assume maximal wait time is 12 hours.
-MAX_RUN_TIME = 12 * 60 * 60  # assume maximal runtime is 12 hours
-
-# each job has three features: wait_time, requested_node, runtime, machine states,
-JOB_FEATURES = 9
-DEBUG = False
-
-JOB_SEQUENCE_SIZE = 256
-SKIP_TIME = 360  # skip 60 seconds
+from .env_conf import *
 
 
 class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
     def __init__(self,
-                 shuffle=False,
+                 workload_file,
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
@@ -34,7 +23,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  seed=0):
 
         HPCSchedulingSimulator.__init__(self,
-                                        shuffle=shuffle,
+                                        workload_file=workload_file,
                                         back_fill=back_fill,
                                         skip=skip,
                                         job_score_type=job_score_type,
@@ -42,22 +31,45 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                                         seed=seed
                                         )
 
+        job_space = spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(MAX_QUEUE_SIZE, JOB_FEATURES),
+            dtype=np.float32
+        )
+
         self.action_space = spaces.Discrete(MAX_QUEUE_SIZE)
+        self.observation_space = job_space
+        # self.build_observation_space()
 
-        ob = spaces.Box(low=0.0, high=1.0, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
+    def build_observation_space(self):
+        job_space = spaces.Box(
+            low=-1.0,
+            high=1.0,
+            shape=(MAX_QUEUE_SIZE, JOB_FEATURES),
+            dtype=np.float32
+        )
 
-        self.observation_space = ob
+        cluster_space = spaces.box.Box(
+            low=-1.0,
+            high=1.0,
+            shape=self.cluster.state.shape,
+            dtype=np.float32
+        )
 
-    @staticmethod
-    def build_observation_space():
-        # todo: represent the cluster into correct machine state
+        self.observation_space = gym.spaces.tuple.Tuple(
+            (
+                job_space,
+                cluster_space
+            )
+        )
 
-        # time_stamp = 1
-
-        # job_state = spaces.Box(low=0.0, high=1.0, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
-
-        # machine_state = spaces.Box(low=-1, high=100000, shape=(JOB_FEATURES * MAX_QUEUE_SIZE,), dtype=np.float32)
-        pass
+        self.observation_space.n = np.sum(  # type: ignore
+            [
+                np.prod(e.shape) if isinstance(e, gym.spaces.box.Box) else e.n
+                for e in self.observation_space
+            ]
+        )
 
     def seed(self, seed=None):
         return super().seed(seed)
@@ -122,74 +134,63 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.job_queue.sort(key=lambda j: score_func(j))
         return self.job_queue[:MAX_QUEUE_SIZE]
 
-    def build_job_features(self, job):
+    def build_job_features(self, job, epsilon=1e-6):
         submit_time = job.submit_time
         request_processors = job.request_number_of_processors
+        run_time = job.run_time
         request_time = job.request_time
-        # run_time = job.run_time
         wait_time = self.current_timestamp - submit_time
 
         # make sure that larger value is better.
-        normalized_wait_time = min(float(wait_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
-        normalized_run_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - 1e-5)
-        normalized_request_nodes = min(float(request_processors) / float(self.loads.max_procs), 1.0 - 1e-5)
+        normalized_wait_time = min(float(wait_time) / float(MAX_WAIT_TIME), 1.0 - epsilon)
+        normalized_request_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - epsilon)
+        normalized_run_time = min(float(run_time) / float(self.loads.max_exec_time), 1.0 - epsilon)
+        normalized_request_procs = min(float(request_processors) / float(self.loads.max_procs), 1.0 - epsilon)
+        normalized_submit_time = min(float(submit_time) / float(self.loads.end_time), 1.0 - epsilon)
 
-        '''
-        @ddai: part 2 of OPTIMIZE_OBSV
-        earliest_start_time = 1
-        for fp, ts in free_processors_pair:
-            if request_processors < fp:
-                earliest_start_time = ts
-                break
-        normalized_earliest_start_time = min(float(earliest_start_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
-        '''
-
-        # add extra parameters, include "Requested Memory", "User Id", "Groupd Id", "Exectuable Id",
-        # if its value does not exist in the trace (-1), we set it to 1 by default.
         if job.request_memory == -1:
             normalized_request_memory = 1
         else:
             normalized_request_memory = min(float(job.request_memory) / float(self.loads.max_requested_memory),
-                                            1.0 - 1e-5)
+                                            1.0 - epsilon)
 
         if job.user_id == -1:
             normalized_user_id = 1
         else:
-            normalized_user_id = min(float(job.user_id) / float(self.loads.max_user_id), 1.0 - 1e-5)
+            normalized_user_id = min(float(job.user_id) / float(self.loads.max_user_id), 1.0 - epsilon)
 
         if job.group_id == -1:
             normalized_group_id = 1
         else:
-            normalized_group_id = min(float(job.group_id) / float(self.loads.max_group_id), 1.0 - 1e-5)
+            normalized_group_id = min(float(job.group_id) / float(self.loads.max_group_id), 1.0 - epsilon)
 
         if job.executable_number == -1:
             normalized_executable_id = 1
         else:
             normalized_executable_id = min(
-                float(job.executable_number) / float(self.loads.max_executable_number), 1.0 - 1e-5)
+                float(job.executable_number) / float(self.loads.max_executable_number), 1.0 - epsilon)
 
         if self.cluster.fits(job):
-            can_schedule_now = 1.0 - 1e-5
+            can_schedule_now = 1.0 - epsilon
         else:
-            can_schedule_now = 1e-5
-        return [job, normalized_wait_time, normalized_run_time, normalized_request_nodes,
-                normalized_request_memory, normalized_user_id, normalized_group_id,
+            can_schedule_now = epsilon
+
+        return [job, normalized_submit_time, normalized_wait_time, normalized_request_time, normalized_run_time,
+                normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
                 normalized_executable_id, can_schedule_now, 1]
 
     def build_skip_features(self):
         if self.pivot_job:
-            return [None, 1, 1, 1, 1, 1, 1, 1, 1, 0]
+            return [None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]
         else:
-            return [None, 1, 1, 1, 1, 1, 1, 1, 0, 0]
+            return [None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0]
+
+    def build_cluster_state(self):
+        return np.array(self.cluster.state)
 
     def build_observation(self):
         self.job_queue.sort(key=lambda j: self.scorer.fcfs_score(j))
-        self.visible_jobs = self.job_queue[:MAX_QUEUE_SIZE]
 
-        if self.shuffle:
-            self.np_random.shuffle(self.visible_jobs)
-
-        # @ddai: optimize the observable jobs
         self.visible_jobs = []
         if len(self.job_queue) <= MAX_QUEUE_SIZE:
             self.visible_jobs = self.job_queue[:len(self.job_queue)]
@@ -217,7 +218,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         # Code for OPTIMIZE_OBSV omitted for brevity
 
-        vector = np.zeros(MAX_QUEUE_SIZE * JOB_FEATURES, dtype=float)
         self.pairs = []
         add_skip = False
         for i in range(MAX_QUEUE_SIZE):
@@ -228,12 +228,11 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                 add_skip = True
                 self.pairs.append(self.build_skip_features())
             else:
-                self.pairs.append([None, 0, 1, 1, 1, 1, 1, 1, 0, 0])
+                self.pairs.append([None, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0])
 
-        for i in range(MAX_QUEUE_SIZE):
-            vector[i * JOB_FEATURES:(i + 1) * JOB_FEATURES] = self.pairs[i][1:]
+        vector = np.vstack(np.array([pair[1:] for pair in self.pairs]), dtype='float32')
 
-        return np.array(vector, dtype=np.float32)
+        return vector  # , self.build_cluster_state()
 
     def check_then_schedule(self, job):
         # make sure we move forward and release needed resources
