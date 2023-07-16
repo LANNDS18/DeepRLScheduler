@@ -6,6 +6,8 @@ import numpy as np
 
 class ScheduleScorer:
     def __init__(self, job_score_type):
+        # 0: Average bounded slowdown, 1: Average waiting time
+        # 2: Average turnaround time, 3: Resource utilization
         self.job_score_type = job_score_type
 
     def scheduling_matrices(self, job):

@@ -30,6 +30,8 @@ class HPCSchedulingSimulator(ABC):
         self.job_queue = []
         self.running_jobs = []
         self.visible_jobs = []
+        self.complete_jobs = []
+
         self.pairs = []
 
         self.current_timestamp = 0
@@ -37,18 +39,14 @@ class HPCSchedulingSimulator(ABC):
         self.next_arriving_job_idx = 0
         self.last_job_in_batch = 0
         self.num_job_in_batch = 0
-        self.start_idx_last_reset = 0
 
         # sub-components
         self.loads = Workloads()
         self.cluster = None
-        # 0: Average bounded slowdown, 1: Average waiting time
-        # 2: Average turnaround time, 3: Resource utilization
+
         self.scorer = ScheduleScorer(job_score_type)
 
-        self.bsld_algo_dict = {}
         self.scheduled_rl = {}
-        self.penalty = 0
         self.pivot_job = False
         self.enable_pre_workloads = False
         self.pre_workloads = []
@@ -77,8 +75,7 @@ class HPCSchedulingSimulator(ABC):
         # Generate some running jobs to randomly fill the cluster.
         # size = self.np_random.randint(2 * job_sequence_size)
         if self.enable_pre_workloads:
-            running_job_size = size
-            for i in range(running_job_size):
+            for i in range(size):
                 _job = self.loads[self.start - i - 1]
                 req_num_of_processors = _job.request_number_of_processors
                 runtime_of_job = _job.request_time
@@ -92,13 +89,8 @@ class HPCSchedulingSimulator(ABC):
                 job_tmp.run_time = runtime_of_job
                 if self.cluster.fits(job_tmp):
                     self.running_jobs.append(job_tmp)
-                    job_tmp.scheduled_time = max(0,
-                                                 (self.current_timestamp - self.np_random.randint(0,
-                                                                                                  max(runtime_of_job, 1)
-                                                                                                  )
-                                                  )
-                                                 )
-                    # job_tmp.scheduled_time = max(0, (self.current_timestamp - runtime_of_job/2))
+                    job_tmp.scheduled_time = max(0, (self.current_timestamp -
+                                                     self.np_random.randint(0, max(runtime_of_job, 1))))
                     job_tmp.allocated_machines = self.cluster.allocate(job_tmp)
                     self.pre_workloads.append(job_tmp)
                 else:
@@ -199,6 +191,8 @@ class HPCSchedulingSimulator(ABC):
         job.allocated_machines = self.cluster.allocate(job)
         self.running_jobs.append(job)
         score = self.scorer.scheduling_matrices(job)  # calculated reward
+
+        self.complete_jobs.append(job)
         self.scheduled_rl[job.job_id] = score
         self.job_queue.remove(job)  # remove the job from job queue
 
@@ -242,7 +236,8 @@ class HPCSchedulingSimulator(ABC):
         """Processes the job queue and handles job scheduling.
 
         Returns:
-            bool: True if jobs exist in the queue or if a job was added. False if queue is empty and no jobs can be added.
+            bool: True if jobs exist in the queue or if a job was added.
+            False if queue is empty and no jobs can be added.
         """
         if self.job_queue:
             return True

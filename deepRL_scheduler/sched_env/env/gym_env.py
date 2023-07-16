@@ -234,23 +234,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         return vector  # , self.build_cluster_state()
 
-    def check_then_schedule(self, job):
-        # make sure we move forward and release needed resources
-        if not self.cluster.fits(job):
-            if self.back_fill:
-                self.skip_to_resource_backfilling(job)
-            else:
-                self.skip_to_resource(job)
-
-        # we should be OK to schedule the job now
-        self.schedule_job(job)
-        not_done = self.process_job_queue()
-
-        if not_done:
-            return False
-        else:
-            return True
-
     def step(self, a):
         job_for_scheduling = self.pairs[a][0]
         if not job_for_scheduling:
@@ -262,10 +245,10 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             obs = self.build_observation()
             return [obs, 0, False, {'current_timestamp': self.current_timestamp}]
         else:
-            self.scheduled_rl = self.scorer.post_process_matrices(self.scheduled_rl, self.num_job_in_batch,
-                                                                  self.current_timestamp, self.loads[self.start],
-                                                                  self.loads.max_procs)
+            scheduled_rl = self.scorer.post_process_matrices(self.scheduled_rl, self.num_job_in_batch,
+                                                             self.current_timestamp, self.loads[self.start],
+                                                             self.loads.max_procs)
 
-            rl_total = sum(self.scheduled_rl.values())
+            rl_total = sum(scheduled_rl.values())
             rwd = -rl_total
             return [None, rwd, True, {'current_timestamp': self.current_timestamp}]
