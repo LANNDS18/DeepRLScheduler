@@ -2,25 +2,28 @@
 # -*- coding: utf-8 -*-
 
 import os
-from sched_env.env import TestEnv
+from sched_env.env import GymSchedulerEnv
 from sched_env.scorer import Obs_Scorer
 
 
 def schedule_curr_sequence_reset(_env, score_fn):
     """schedule the sequence of jobs using heuristic algorithm."""
 
-    obs = _env.reset()
-    print(f"Current Time Stamp: {_env.current_timestamp}")
+    job_queue_obs = _env.reset()[0]
 
     while True:
 
-        min_index, min_value = min(enumerate(obs), key=lambda pair: score_fn(pair[1]))
-        obs, rwd, done, _ = _env.step(min_index)
+        action, min_value = min(enumerate(job_queue_obs), key=lambda pair: score_fn(pair[1]))
+        obs, rwd, done, info = _env.step(action)
+        job_queue_obs = obs[0]
 
         if done:
+            record = info['performance matrix']
+            current_time = info['current_timestamp']
             break
 
-    print(f"Current Time Stamp: {_env.current_timestamp}")
+    print(f"Current Time Stamp: {current_time}")
+    print(f'total performance matrix value: {sum(record.values())}')
     _env.reset()
     return rwd
 
@@ -34,7 +37,7 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = TestEnv(workload_file=workload_file, batch_job_slice=700, back_fill=False, seed=0)
+    env = GymSchedulerEnv(workload_file=workload_file, batch_job_slice=700, back_fill=True, seed=0)
 
     print(schedule_curr_sequence_reset(env, Obs_Scorer.sjf_score))
     print(schedule_curr_sequence_reset(env, Obs_Scorer.fcfs_score))

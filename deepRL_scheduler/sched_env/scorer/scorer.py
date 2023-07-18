@@ -26,11 +26,11 @@ class ScheduleScorer:
 
         return calculation(job)
 
-    def post_process_matrices(self, scheduled_logs, num_job_in_batch, current_timestamp, start_job, max_procs):
+    def post_process_matrices(self, scheduled_logs, num_job, current_timestamp, start_job, max_procs):
 
         for i in scheduled_logs:
             if self.job_score_type in [0, 1, 2, 4]:
-                scheduled_logs[i] /= num_job_in_batch
+                scheduled_logs[i] /= num_job
             elif self.job_score_type == 3:
                 scheduled_logs[i] /= (current_timestamp - start_job.submit_time) * max_procs
             else:

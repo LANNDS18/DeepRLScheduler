@@ -40,6 +40,8 @@ class HPCSchedulingSimulator(ABC):
         self.last_job_in_batch = 0
         self.num_job_in_batch = 0
 
+        self.start_idx_last_reset = self.start
+
         # sub-components
         self.loads = Workloads()
         self.cluster = None
@@ -169,9 +171,11 @@ class HPCSchedulingSimulator(ABC):
         # print("start", self.start)
         self.cluster.reset()
         self.loads.reset()
+
         self.job_queue = []
         self.running_jobs = []
         self.visible_jobs = []
+
         self.pairs = []
 
     def move_to_next_event(self, next_release_time, next_release_machines):
@@ -192,7 +196,6 @@ class HPCSchedulingSimulator(ABC):
         self.running_jobs.append(job)
         score = self.scorer.scheduling_matrices(job)  # calculated reward
 
-        self.complete_jobs.append(job)
         self.scheduled_rl[job.job_id] = score
         self.job_queue.remove(job)  # remove the job from job queue
 
@@ -236,13 +239,14 @@ class HPCSchedulingSimulator(ABC):
         """Processes the job queue and handles job scheduling.
 
         Returns:
-            bool: True if jobs exist in the queue or if a job was added.
-            False if queue is empty and no jobs can be added.
+            bool:
+            True if queue is empty and no jobs can be added.
+            False if jobs exist in the queue or if a job was added.
         """
         if self.job_queue:
-            return True
-        elif self.next_arriving_job_idx >= self.last_job_in_batch:
             return False
+        elif self.next_arriving_job_idx >= self.last_job_in_batch:
+            return True
         else:
             # If job queue is empty, attempt to add jobs
             while not self.job_queue:
@@ -259,18 +263,18 @@ class HPCSchedulingSimulator(ABC):
                                                  self.loads[self.next_arriving_job_idx].submit_time)
                     self.job_queue.append(self.loads[self.next_arriving_job_idx])
                     self.next_arriving_job_idx += 1
-                    return True
+                    return False
                 else:
                     # Update current timestamp and remove this job from running jobs
                     self.current_timestamp = max(self.current_timestamp, next_release_time)
                     self.cluster.release(next_release_machines)
                     self.running_jobs.pop(0)
 
-        return False  # Return False if no jobs were added
+        return True  # Return True if no jobs were added
 
     def noop_schedule(self):
-        # schedule nothing, just move forward to next timestamp. It should 1) add a new job; 2) finish a running job;
-        # 3) reach skip time
+        # schedule nothing, just move forward to next timestamp.
+        # It should 1) add a new job; 2) finish a running job; 3) reach skip time;
         next_time_after_skip = self.current_timestamp + SKIP_TIME
 
         next_release_time = sys.maxsize  # always add jobs if no resource can be released.
@@ -300,22 +304,25 @@ class HPCSchedulingSimulator(ABC):
             self.running_jobs.pop(0)  # remove the first running job.
         return False
 
-    def check_then_schedule(self, job):
-        # make sure we move forward and release needed resources
-        if not self.cluster.fits(job):
-            if self.back_fill:
-                self.skip_to_resource_backfilling(job)
-            else:
-                self.skip_to_resource(job)
+    def check_then_schedule(self, action):
 
-        # we should be OK to schedule the job now
-        self.schedule_job(job)
-        not_done = self.process_job_queue()
+        job = self.pairs[action].get_job()
+        if not job:
+            done = self.noop_schedule()
+            return done
 
-        if not_done:
-            return False
         else:
-            return True
+            # make sure we move forward and release needed resources
+            if not self.cluster.fits(job):
+                if self.back_fill:
+                    self.skip_to_resource_backfilling(job)
+                else:
+                    self.skip_to_resource(job)
+
+            # we should be OK to schedule the job now
+            self.schedule_job(job)
+            done = self.process_job_queue()
+            return done
 
     def build_critic_observation(self):
         raise NotImplementedError
