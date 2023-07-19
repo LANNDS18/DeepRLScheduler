@@ -37,7 +37,7 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = GymSchedulerEnv(workload_file=workload_file, batch_job_slice=700, back_fill=True, seed=0)
+    env = GymSchedulerEnv(workload_file=workload_file, batch_job_slice=700, back_fill=False, seed=0)
 
     print(schedule_curr_sequence_reset(env, Obs_Scorer.sjf_score))
     print(schedule_curr_sequence_reset(env, Obs_Scorer.fcfs_score))

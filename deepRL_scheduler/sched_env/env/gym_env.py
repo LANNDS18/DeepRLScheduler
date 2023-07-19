@@ -12,10 +12,22 @@ from abc import ABC
 from .scheduler_simulator import HPCSchedulingSimulator
 from .env_conf import *
 
-from ..job import JobTransition
+from ..job import JobTransition, Job
 
 
 class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
+    """
+    Reinforcement learning environment that simulates a High Performance Computing (HPC) scheduler.
+    It extends the 'HPCSchedulingSimulator' class and the 'gym.Env' class from OpenAI Gym.
+
+    Attributes:
+    self.done (bool): A flag indicating whether the episode is over.
+    self.passed_step(int): Number of steps passed in the current episode
+    self.action_space (gym.spaces.Discrete): The action space of the environment, which is a discrete space
+        containing MAX_QUEUE_SIZE possible actions.
+    self.observation_space (gym.spaces.Box or None): The observation space of the environment, which is a box
+        space containing fixed-size arrays of values that represent the state of the environment.
+    """
     def __init__(self,
                  workload_file,
                  back_fill=False,
@@ -25,6 +37,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  seed=0):
 
         self.done = False
+        self.passed_step = 0
 
         HPCSchedulingSimulator.__init__(self,
                                         workload_file=workload_file,
@@ -40,6 +53,12 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.build_observation_space()
 
     def build_observation_space(self):
+        """
+        This function builds the observation space for the environment. This space consists of a tuple of two spaces:
+        the job space which represents the jobs in the queue, and the cluster space which represents the state of the
+        cluster.
+        """
+
         job_space = spaces.Box(
             low=-1.0,
             high=1.0,
@@ -69,13 +88,22 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         )
 
     def seed(self, seed=None):
+        """
+        This function sets the seed for this environment's random number generator.
+
+        Parameters:
+            seed (int, optional): The seed for the random number generator. Defaults to None.
+
+        Returns:
+            list of int: The seed for the random number generator.
+        """
         return super().seed(seed)
 
     def build_critic_observation(self):
         vector = np.zeros(JOB_SEQUENCE_SIZE * 3, dtype=float)
         earliest_job = self.loads[self.start_idx_last_reset]
         earliest_submit_time = earliest_job.submit_time
-        pairs = []
+        obs_transitions = []
         for i in range(self.start_idx_last_reset, self.last_job_in_batch + 1):
             job = self.loads[i]
             submit_time = job.submit_time - earliest_submit_time
@@ -86,18 +114,40 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             normalized_run_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - 1e-5)
             normalized_request_nodes = min(float(request_processors) / float(self.loads.max_procs), 1.0 - 1e-5)
 
-            pairs.append([normalized_submit_time, normalized_run_time, normalized_request_nodes])
+            obs_transitions.append([normalized_submit_time, normalized_run_time, normalized_request_nodes])
 
         for i in range(JOB_SEQUENCE_SIZE):
-            vector[i * 3:(i + 1) * 3] = pairs[i]
+            vector[i * 3:(i + 1) * 3] = obs_transitions[i]
 
         return vector
 
-    def _jobs_by_score(self, score_func):
+    def _jobs_by_score(self, score_func) -> list[Job]:
+        """
+        This helper function sorts the job queue based on a given score function, and then returns the top jobs up to
+        the maximum queue size.
+
+        Parameters:
+            score_func (function): The function used to score the jobs in the queue.
+
+        Returns:
+            list of Job: The top jobs from the job queue based on the score function.
+        """
         self.job_queue.sort(key=lambda j: score_func(j))
         return self.job_queue[:MAX_QUEUE_SIZE]
 
-    def _job_features(self, job, epsilon=1e-6):
+    def _job_features(self, job: Job, epsilon: float = 1e-6) -> JobTransition:
+        """
+        Extracts and normalizes the features of a given job. If a feature value is not available
+        (denoted by -1), it is set to 1. If the job fits in the cluster, the 'can_schedule_now' feature is set to 1,
+        otherwise it is set to 0.
+
+        Parameters:
+            job (Job): The job whose features are to be extracted.
+            epsilon (float, optional): A small value used to avoid division by zero errors. Defaults to 1e-6.
+
+        Returns:
+            JobTransition: A JobTransition object representing the features of the job.
+        """
         submit_time = job.submit_time
         request_processors = job.request_number_of_processors
         run_time = job.run_time
@@ -143,16 +193,33 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
              normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
              normalized_executable_id, can_schedule_now, 1])
 
-    def _skip_features(self):
+    def _skip_features(self) -> JobTransition:
+        """
+        Returns a JobTransition object representing the features of a skipped job. If 'pivot_job'
+        is True, the last feature is set to 0, otherwise it is set to 1.
+
+        Returns:
+            JobTransition: A JobTransition object representing the features of a skipped job.
+        """
         if self.pivot_job:
             return JobTransition.from_list([None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0])
         else:
             return JobTransition.from_list([None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0])
 
-    def build_cluster_state(self):
+    def build_cluster_state(self) -> np.ndarray:
+        """
+        Returns the state of the cluster as a numpy array.
+        """
         return np.array(self.cluster.state)
 
-    def build_job_queue_state(self):
+    def build_job_queue_state(self) -> np.ndarray:
+        """
+        Building the state of current visible job queue
+
+        Returns:
+            vector (np.ndarray): A numpy array representing the list of job transitions.
+        """
+
         self.job_queue.sort(key=lambda j: self.scorer.fcfs_score(j))
 
         self.visible_jobs = []
@@ -180,23 +247,32 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                         index += 1
                 global_index += 1
 
-        self.pairs = []
+        self.obs_transitions = []
         add_skip = False
         for i in range(MAX_QUEUE_SIZE):
             if i < len(self.visible_jobs):
                 job = self.visible_jobs[i]
-                self.pairs.append(self._job_features(job))
+                self.obs_transitions.append(self._job_features(job))
             elif self.skip and not add_skip:
                 add_skip = True
-                self.pairs.append(self._skip_features())
+                self.obs_transitions.append(self._skip_features())
             else:
-                self.pairs.append(JobTransition.from_list([None, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0]))
+                self.obs_transitions.append(JobTransition.from_list([None, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0]))
 
-        vector = np.vstack(np.array([pair.to_list() for pair in self.pairs]), dtype='float32')
+        vector = np.vstack(np.array([pair.to_list() for pair in self.obs_transitions]), dtype='float32')
 
         return vector
 
-    def get_reward(self):
+    def get_reward(self) -> float:
+
+        """
+        Uses the 'post_process_matrices' method from the scorer to process the 'scheduled_rl' and obtain a reward for
+        each job. It then returns the negative sum of these rewards as the total reward.
+
+        Returns:
+            rl_total (float): The total reward, calculated as the negative sum of individual job rewards.
+        """
+
         complete_job_reward = self.scorer.post_process_matrices(copy.copy(self.scheduled_rl),
                                                                 len(self.scheduled_rl),
                                                                 self.current_timestamp,
@@ -206,50 +282,54 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         rl_total = -sum(complete_job_reward.values())
         return rl_total
 
-    def reset(self, **kwargs):
-        self.reset_env_component()
+    def reset(self, **kwargs) -> gym.spaces.tuple:
+        """
+        .reset() function resets the simulation environment by resetting the cluster and the loads, and initializing various
+        instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
+        observation.
 
-        self.current_timestamp = 0
-        self.start = 0
-        self.next_arriving_job_idx = 0
-        self.last_job_in_batch = 0
-        self.num_job_in_batch = 0
-        self.scheduled_rl = {}
-        self.pivot_job = False
+        Parameters:
+            kwargs (dict): A dictionary of keyword arguments. These arguments are not used in this function.
 
-        job_sequence_size = JOB_SEQUENCE_SIZE
+        Returns:
+            observation (gym.spaces.tuple): A tuple containing the initial state of the job queue and the cluster.
+        """
 
-        self.pre_workloads = []
+        self.reset_simulator()
+        self.build_observation_space()
 
-        assert self.batch_job_slice == 0 or self.batch_job_slice >= job_sequence_size
-
-        if self.batch_job_slice == 0:
-            self.start = self.np_random.randint(job_sequence_size, (self.loads.size() - job_sequence_size - 1))
-        else:
-            self.start = self.np_random.randint(job_sequence_size, (self.batch_job_slice - job_sequence_size - 1))
-
-        self.start_idx_last_reset = self.start
-        self.next_arriving_job_idx = self.start + 1
-        self.num_job_in_batch = job_sequence_size
-        self.last_job_in_batch = self.start + self.num_job_in_batch
-        self.current_timestamp = self.loads[self.start].submit_time
-        self.job_queue.append(self.loads[self.start])
-
-        self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
-
+        self.done = False
+        self.passed_step = 0
         observation = (self.build_job_queue_state(), self.build_cluster_state())
 
         return observation
 
-    def step(self, a):
+    def step(self, a: int) -> list[gym.spaces.tuple, float, bool, tuple]:
+        """
+        This function is the core of the environment's interaction loop. It takes an action, checks and schedules
+        the corresponding job, and then calculates the reward. It also builds the new observation and returns a list
+        containing the new observation, the reward, a boolean indicating whether the episode is done, and a
+        dictionary containing the current timestamp and the performance matrix.
+
+        Parameters:
+            a (int): The action taken by the agent, which is an integer representing the index of the job in the job
+            queue.
+
+        Returns:
+            List [observation, reward, self.done, additional_info]:
+                observation (gym.spaces.tuple): A tuple containing the new state of the job queue and the cluster.
+                reward (float): The reward for taking action 'a'.
+                self.done (bool): A boolean indicating whether the episode is done.
+                additional_info (dict): A dictionary containing the current timestamp and the performance matrix.
+        """
+
         if 0 <= a <= len(self.job_queue) - 1:
             action = a
         else:
-            action = self.job_queue - 1
+            action = len(self.job_queue) - 1
 
         self.done = self.check_then_schedule(action)
         reward = self.get_reward()
-
         observation = (self.build_job_queue_state(), self.build_cluster_state())
 
         return [
