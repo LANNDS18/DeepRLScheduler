@@ -21,21 +21,26 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
     It extends the 'HPCSchedulingSimulator' class and the 'gym.Env' class from OpenAI Gym.
 
     Attributes:
+    self.flatten_observation (bool): A flag indicate whether flatten the observation into one-dim vector or not.
     self.done (bool): A flag indicating whether the episode is over.
     self.passed_step(int): Number of steps passed in the current episode
     self.action_space (gym.spaces.Discrete): The action space of the environment, which is a discrete space
         containing MAX_QUEUE_SIZE possible actions.
-    self.observation_space (gym.spaces.Box or None): The observation space of the environment, which is a box
+
+    self.observation_space (gym.spaces): The observation space of the environment, which is a tuple
         space containing fixed-size arrays of values that represent the state of the environment.
     """
+
     def __init__(self,
                  workload_file,
+                 flatten_observation=False,
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
                  batch_job_slice=0,
                  seed=0):
 
+        self.flatten_observation = flatten_observation
         self.done = False
         self.passed_step = 0
 
@@ -58,7 +63,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         the job space which represents the jobs in the queue, and the cluster space which represents the state of the
         cluster.
         """
-
         job_space = spaces.Box(
             low=-1.0,
             high=1.0,
@@ -73,19 +77,32 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             dtype=np.float32
         )
 
-        self.observation_space = gym.spaces.tuple.Tuple(
-            (
-                job_space,
-                cluster_space
+        if not self.flatten_observation:
+            self.observation_space = gym.spaces.tuple.Tuple(
+                (
+                    job_space,
+                    cluster_space
+                )
             )
-        )
 
-        self.observation_space.n = np.sum(  # type: ignore
-            [
-                np.prod(e.shape) if isinstance(e, gym.spaces.box.Box) else e.n
-                for e in self.observation_space
-            ]
-        )
+            self.observation_space.n = np.sum(  # type: ignore
+                [
+                    np.prod(e.shape) if isinstance(e, gym.spaces.box.Box) else e.n
+                    for e in self.observation_space
+                ]
+            )
+        else:
+            # Calculate the total size of the flattened observation space
+            total_size = np.prod(job_space.shape) + np.prod(cluster_space.shape)
+
+            self.observation_space = spaces.Box(
+                low=-1.0,
+                high=1.0,
+                shape=(total_size,),
+                dtype=np.float32
+            )
+
+            self.observation_space.n = total_size
 
     def seed(self, seed=None):
         """
@@ -208,9 +225,12 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
     def build_cluster_state(self) -> np.ndarray:
         """
-        Returns the state of the cluster as a numpy array.
+        Returns the normalised state of the cluster as a numpy array.
         """
-        return np.array(self.cluster.state)
+        state = []
+        for i, node in enumerate(self.cluster.state):
+            state.append(min(max(float(node) / float(self.loads.max_job_id), -1), 1.0))
+        return np.array(state)
 
     def build_job_queue_state(self) -> np.ndarray:
         """
@@ -282,17 +302,38 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         rl_total = -sum(complete_job_reward.values())
         return rl_total
 
+    def get_observation(self) -> np.ndarray:
+        """
+        Get observation from the current state
+
+        Returns:
+             observation (gym.spaces.tuple or gym.spaces.Box):
+             A tuple containing the initial state of the job queue and the cluster.
+             Or a flatten vector containing or flatten information.
+        """
+        obs_job, obs_cluster = (self.build_job_queue_state(), self.build_cluster_state())
+
+        if self.flatten_observation:
+            obs_job_flat = np.reshape(obs_job, -1)
+            obs_cluster_flat = np.reshape(obs_cluster, -1)
+            observation = np.concatenate((obs_job_flat, obs_cluster_flat), dtype='float32')
+
+        else:
+            observation = (obs_job, obs_cluster)
+
+        return observation
+
     def reset(self, **kwargs) -> gym.spaces.tuple:
         """
-        .reset() function resets the simulation environment by resetting the cluster and the loads, and initializing various
-        instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
+        Resets the simulation environment by resetting the cluster and the loads, and initializing various instance
+        variables to their starting values. It then optionally fills some pre-workloads and returns the initial
         observation.
 
         Parameters:
             kwargs (dict): A dictionary of keyword arguments. These arguments are not used in this function.
 
         Returns:
-            observation (gym.spaces.tuple): A tuple containing the initial state of the job queue and the cluster.
+            observation: A vector containing the initial state of the job queue and the cluster.
         """
 
         self.reset_simulator()
@@ -300,7 +341,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         self.done = False
         self.passed_step = 0
-        observation = (self.build_job_queue_state(), self.build_cluster_state())
+        observation = self.get_observation()
 
         return observation
 
@@ -330,7 +371,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         self.done = self.check_then_schedule(action)
         reward = self.get_reward()
-        observation = (self.build_job_queue_state(), self.build_cluster_state())
+        observation = self.get_observation()
 
         return [
             observation,

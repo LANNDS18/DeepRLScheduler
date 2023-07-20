@@ -55,6 +55,8 @@ class Workloads:
                     self.max_group_id = j.group_id
                 if j.executable_number > self.max_executable_number:
                     self.max_executable_number = j.executable_number
+                if j.job_id > self.max_job_id:
+                    self.max_job_id = j.job_id
 
                 # filter those illegal data whose runtime < 0
                 if j.run_time < 0:
