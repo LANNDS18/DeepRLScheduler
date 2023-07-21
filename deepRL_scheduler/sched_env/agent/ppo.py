@@ -133,15 +133,15 @@ class CustomTorchModel(nn.Module):
             x (torch.Tensor): input tensor
         Returns:
             torch.Tensor: output tensor"""
-        try:
-            x_reshape = x[:, :JOB_FEATURES * MAX_QUEUE_SIZE]
-        except RuntimeError:
-            print(x.shape)
+        x_job = x[:, :JOB_FEATURES * MAX_QUEUE_SIZE]
+
+        x_cluster = x[:, JOB_FEATURES * MAX_QUEUE_SIZE:]
+
         if self.actor_model == 'conv':
-            x = torch.reshape(x_reshape, (-1, self.m, self.m, JOB_FEATURES))
+            x = torch.reshape(x_job, (-1, self.m, self.m, JOB_FEATURES))
             x = self.models[self.actor_model](x)
         elif self.actor_model in ['kernel', 'attn']:
-            x = x_reshape.reshape(-1, MAX_QUEUE_SIZE, JOB_FEATURES)
+            x = x_job.reshape(-1, MAX_QUEUE_SIZE, JOB_FEATURES)
             mask = x[:, :, -1]
             mask = mask.squeeze()
             x = x[:, :, :-1]
