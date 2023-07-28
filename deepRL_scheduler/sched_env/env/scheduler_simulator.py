@@ -225,7 +225,7 @@ class HPCSchedulingSimulator(ABC):
                 break
 
         while not self.cluster.fits(large_job):
-            self.job_queue.sort(key=lambda _j: self.scorer.smallest_score(_j))
+            self.job_queue.sort(key=lambda _j: self.scorer.fcfs_score(_j))
             job_queue_iter_copy = list(self.job_queue)
             for _j in job_queue_iter_copy:
                 if self.cluster.fits(_j) and (self.current_timestamp + _j.request_time) < earliest_start_time:
@@ -332,6 +332,11 @@ class HPCSchedulingSimulator(ABC):
             False if the simulation has not completed.
         """
 
+        if 0 <= action <= MAX_QUEUE_SIZE - 1:
+            action = action
+        else:
+            action = MAX_QUEUE_SIZE - 1
+
         job = self.obs_transitions[action].get_job()
         if not job:
             done = self.noop_schedule()
@@ -379,7 +384,7 @@ class HPCSchedulingSimulator(ABC):
         assert self.batch_job_slice == 0 or self.batch_job_slice >= job_sequence_size
 
         if self.batch_job_slice == 0:
-            self.start = self.np_random.randint(job_sequence_size, (self.loads.size() - job_sequence_size - 1))
+            self.start = self.np_random.randint(job_sequence_size, (self.loads.size - job_sequence_size - 1))
         else:
             self.start = self.np_random.randint(job_sequence_size, (self.batch_job_slice - job_sequence_size - 1))
 
@@ -391,15 +396,3 @@ class HPCSchedulingSimulator(ABC):
         self.job_queue.append(self.loads[self.start])
 
         self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))
-
-    def build_critic_observation(self):
-        raise NotImplementedError
-
-    def build_observation(self):
-        raise NotImplementedError
-
-    def step(self, action):
-        raise NotImplementedError
-
-    def reset(self, **kwargs):
-        raise NotImplementedError

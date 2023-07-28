@@ -116,28 +116,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         """
         return super().seed(seed)
 
-    def build_critic_observation(self):
-        vector = np.zeros(JOB_SEQUENCE_SIZE * 3, dtype=float)
-        earliest_job = self.loads[self.start_idx_last_reset]
-        earliest_submit_time = earliest_job.submit_time
-        obs_transitions = []
-        for i in range(self.start_idx_last_reset, self.last_job_in_batch + 1):
-            job = self.loads[i]
-            submit_time = job.submit_time - earliest_submit_time
-            request_processors = job.request_number_of_processors
-            request_time = job.request_time
-
-            normalized_submit_time = min(float(submit_time) / float(MAX_WAIT_TIME), 1.0 - 1e-5)
-            normalized_run_time = min(float(request_time) / float(self.loads.max_exec_time), 1.0 - 1e-5)
-            normalized_request_nodes = min(float(request_processors) / float(self.loads.max_procs), 1.0 - 1e-5)
-
-            obs_transitions.append([normalized_submit_time, normalized_run_time, normalized_request_nodes])
-
-        for i in range(JOB_SEQUENCE_SIZE):
-            vector[i * 3:(i + 1) * 3] = obs_transitions[i]
-
-        return vector
-
     def _jobs_by_score(self, score_func) -> list[Job]:
         """
         This helper function sorts the job queue based on a given score function, and then returns the top jobs up to
@@ -283,7 +261,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         return vector
 
-    def get_reward(self) -> float:
+    def get_reward(self, job_queue_weight=0.5) -> float:
 
         """
         Uses the 'post_process_matrices' method from the scorer to process the 'scheduled_rl' and obtain a reward for
@@ -294,7 +272,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         """
 
         complete_job_reward = self.scorer.post_process_matrices(copy.copy(self.scheduled_rl),
-                                                                len(self.scheduled_rl),
                                                                 self.current_timestamp,
                                                                 self.loads[self.start],
                                                                 self.loads.max_procs)
@@ -314,9 +291,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         obs_job, obs_cluster = (self.build_job_queue_state(), self.build_cluster_state())
 
         if self.flatten_observation:
-            obs_job_flat = np.reshape(obs_job, -1)
-            obs_cluster_flat = np.reshape(obs_cluster, -1)
-            observation = np.concatenate((obs_job_flat, obs_cluster_flat), dtype='float32')
+            observation = np.concatenate((np.reshape(obs_job, -1), np.reshape(obs_cluster, -1)), dtype='float32')
 
         else:
             observation = (obs_job, obs_cluster)
@@ -364,12 +339,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                 additional_info (dict): A dictionary containing the current timestamp and the performance matrix.
         """
 
-        if 0 <= a <= len(self.job_queue) - 1:
-            action = a
-        else:
-            action = len(self.job_queue) - 1
-
-        self.done = self.check_then_schedule(action)
+        self.done = self.check_then_schedule(a)
         reward = self.get_reward()
         observation = self.get_observation()
 
@@ -378,5 +348,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             reward,
             self.done,
             {'current_timestamp': self.current_timestamp,
-             'performance matrix': self.scheduled_rl}
+             'performance matrix': self.scheduled_rl,
+             'start': self.start}
         ]

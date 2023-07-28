@@ -26,17 +26,23 @@ class ScheduleScorer:
 
         return calculation(job)
 
-    def post_process_matrices(self, scheduled_logs, num_job, current_timestamp, start_job, max_procs):
+    def post_process_matrices(self, scheduled_logs, current_timestamp, start_job, max_procs):
+
+        num_job = len(scheduled_logs)
 
         for i in scheduled_logs:
-            if self.job_score_type in [0, 1, 2, 4]:
-                scheduled_logs[i] /= num_job
-            elif self.job_score_type == 3:
-                scheduled_logs[i] /= (current_timestamp - start_job.submit_time) * max_procs
-            else:
-                raise NotImplementedError("Invalid job_score_type")
-
+            scheduled_logs[i] = self.normalize_single_score(
+                scheduled_logs[i], num_job, current_timestamp, start_job, max_procs)
         return scheduled_logs
+
+    def normalize_single_score(self, job_score, num_job, current_timestamp, start_job, max_procs):
+        if self.job_score_type in [0, 1, 2, 4]:
+            job_score /= num_job
+        elif self.job_score_type == 3:
+            job_score /= (current_timestamp - start_job.submit_time) * max_procs
+        else:
+            raise NotImplementedError("Invalid job_score_type")
+        return job_score
 
     @staticmethod
     def f1_score(job):

@@ -11,5 +11,5 @@ MAX_RUN_TIME = 12 * 60 * 60  # assume maximal runtime is 12 hours
 JOB_FEATURES = 11
 DEBUG = False
 
-JOB_SEQUENCE_SIZE = 256
-SKIP_TIME = 360  # skip 60 seconds
+JOB_SEQUENCE_SIZE = 2000
+SKIP_TIME = 60  # skip 60 seconds

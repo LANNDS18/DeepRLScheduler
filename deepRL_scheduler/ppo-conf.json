@@ -1,7 +1,7 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
     "model_dir": "./trained_models",
-    "log_dir": "./data/logs/SDSC-SP2",
+    "log_dir": "./data/logs/HPC2N",
     "gamma": 0.99,
     "gae_lambda": 0.95,
     "seed": 0,

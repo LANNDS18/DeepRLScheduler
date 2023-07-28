@@ -3,7 +3,7 @@
 
 import sys
 
-from deepRL_scheduler.sched_env.job import Job
+from ..job import Job
 
 
 class Workloads:
@@ -24,6 +24,7 @@ class Workloads:
         self.max_procs = 0
         self.end_time = 0
 
+    @property
     def size(self):
         return len(self.all_jobs)
 
@@ -76,6 +77,7 @@ class Workloads:
             f":WORKLOAD:\tmax node: {self.max_nodes}\n"
             f":WORKLOAD:\tmax procs: {self.max_procs}\n"
             f":WORKLOAD:\tmax execution time: {self.max_exec_time}\n"
+            f":WORKLOAD:\tnumber of jobs: {self.size}\n"
         )
 
         self.all_jobs.sort(key=lambda job: job.job_id)

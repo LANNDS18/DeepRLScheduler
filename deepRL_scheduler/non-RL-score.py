@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
+import numpy as np
+
 from sched_env.env import GymSchedulerEnv
 from sched_env.scorer import Obs_Scorer
 
 
-def schedule_curr_sequence_reset(_env, score_fn):
+def schedule_curr_sequence_reset(_env, score_fn, log=True):
     """schedule the sequence of jobs using heuristic algorithm."""
 
     job_queue_obs = _env.reset()[0]
@@ -21,25 +22,26 @@ def schedule_curr_sequence_reset(_env, score_fn):
             record = info['performance matrix']
             current_time = info['current_timestamp']
             break
-
-    print(f"Current Time Stamp: {current_time}")
-    print(f'total performance matrix value: {sum(record.values())}')
-    _env.reset()
+    if log:
+        print(f"Current Time Stamp: {current_time}")
+        print(f'total performance matrix value: {sum(record.values())}')
     return rwd
 
 
+def evaluate_score_fn(workload, score_fn, n_round=10, seed=0):
+    env = GymSchedulerEnv(workload_file=workload,
+                          batch_job_slice=140000,
+                          back_fill=False,
+                          seed=seed)
+
+    rewards = []
+    for i in range(n_round):
+        rewards.append(schedule_curr_sequence_reset(env, score_fn=score_fn, log=False))
+    print(np.mean(rewards))
+
+
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--workload', type=str, default="./dataset/HPC2N-2002-2.2-cln.swf")  # RICC-2010-2
-    args = parser.parse_args()
-    current_dir = os.getcwd()
-    workload_file = os.path.join(current_dir, args.workload)
-
-    env = GymSchedulerEnv(workload_file=workload_file, batch_job_slice=700, back_fill=False, seed=0)
-
-    print(schedule_curr_sequence_reset(env, Obs_Scorer.sjf_score))
-    print(schedule_curr_sequence_reset(env, Obs_Scorer.fcfs_score))
-    print(schedule_curr_sequence_reset(env, Obs_Scorer.smallest_score))
-    print(schedule_curr_sequence_reset(env, Obs_Scorer.f1_score))
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.sjf_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.fcfs_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.smallest_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.f1_score)
