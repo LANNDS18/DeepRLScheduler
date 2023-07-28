@@ -37,7 +37,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  back_fill=False,
                  skip=False,
                  job_score_type=0,
-                 batch_job_slice=0,
+                 trace_sample_range=None,
                  seed=0):
 
         self.flatten_observation = flatten_observation
@@ -49,7 +49,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                                         back_fill=back_fill,
                                         skip=skip,
                                         job_score_type=job_score_type,
-                                        batch_job_slice=batch_job_slice,
+                                        trace_sample_range=trace_sample_range,
                                         seed=seed
                                         )
 
@@ -261,7 +261,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
 
         return vector
 
-    def get_reward(self, job_queue_weight=0.5) -> float:
+    def get_reward(self) -> float:
 
         """
         Uses the 'post_process_matrices' method from the scorer to process the 'scheduled_rl' and obtain a reward for

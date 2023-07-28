@@ -3,7 +3,7 @@ import json
 
 from stable_baselines3 import PPO
 
-from sched_env.agent.ppo import *
+from sched_env.agent import CustomActorCriticPolicy, available_models
 from sched_env.env import GymSchedulerEnv
 
 
@@ -13,7 +13,7 @@ def init_env(workload_path, config):
         workload_file=workload_path,
         skip=config['skip'],
         job_score_type=config['score_type'],
-        batch_job_slice=config['batch_job_slice'],
+        trace_sample_range=config['trace_sample_range'],
     )
     return customEnv
 
@@ -42,7 +42,6 @@ if __name__ == '__main__':
     if config['trained_model']:
         model = PPO.load(config['trained_model'], env=env)
     else:
-        available_models = CustomTorchModel.list_models()
         if config['actor_model'] in available_models and config['critic_model'] in available_models:
             policy_args = {'attn': False, 'actor_model': config['actor_model'], 'critic_model': config['critic_model']}
         else:
@@ -72,6 +71,6 @@ if __name__ == '__main__':
         )
         env_steps = config['rollout_steps'] * config['num_rollouts']
         print(":AGENT-PPO: Learning")
-        model.learn(400000)
+        model.learn(total_timesteps=400000)
         model.save(f"{model_dir}ppo_HPC")
-        print(f"Trained model saved at: {model_dir}ppo_HPC")
+        print(f":AGENT-PPO: Trained model saved at: {model_dir}ppo_HPC")

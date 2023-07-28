@@ -20,7 +20,8 @@
     "backfil": 0,
     "skip": 0,
     "score_type": 0,
-    "batch_job_slice": 0,
+    "trace_sample_range": [0, 0.5],
     "actor_model": "kernel",
-    "critic_model": "critic_lg"
+    "critic_model": "critic_lg",
+    "use_cluster_feature": false
 }

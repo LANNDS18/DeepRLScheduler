@@ -1,6 +1,12 @@
-from train_ppo import init_env, init_dir_from_args
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import json
+
 from stable_baselines3 import PPO
+
+from sched_env.env import GymSchedulerEnv
+from train_ppo import init_dir_from_args
 
 
 def schedule_curr_sequence_reset(_env, model, log=True):
@@ -33,15 +39,11 @@ with open('ppo-conf.json', 'r') as f:
 model_dir, log_data_dir, workload_file = init_dir_from_args(config)
 # create environment
 
-from sched_env.env import GymSchedulerEnv
-
 for i in range(10):
-    slice = 200000 - i * 10000
-    print(slice)
     env = GymSchedulerEnv(
         workload_file="./dataset/HPC2N-2002-2.2-cln.swf",
         flatten_observation=True,
-        batch_job_slice=slice,
+        trace_sample_range=[0, 0.5],
         back_fill=False,
         seed=0
     )

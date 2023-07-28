@@ -13,7 +13,7 @@ if __name__ == '__main__':
     current_dir = os.getcwd()
     workload_file = os.path.join(current_dir, args.workload)
 
-    env = GymSchedulerEnv(workload_file=workload_file, batch_job_slice=700, back_fill=False, seed=0)
+    env = GymSchedulerEnv(workload_file=workload_file, trace_sample_range=[0, 0.5], back_fill=False, seed=0)
     env.reset()
 
     for i in range(5000):
