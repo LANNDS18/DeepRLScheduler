@@ -79,9 +79,10 @@ class Job:
             f'Job<{self.job_id}, {self.status}, start={self.submit_time}, '
             f'processors={self.request_number_of_processors}, '
             f'memory={self.request_memory} '
-            f'duration={self.run_time}>'
+            f'runtime={self.run_time} '
+            f'request_time={self.request_time}>'
         )
 
     def __feature__(self):
-        return [self.submit_time, self.request_number_of_processors, self.request_time,
+        return [self.submit_time, self.run_time, self.request_number_of_processors, self.request_time,
                 self.user_id, self.group_id, self.executable_number, self.queue_number]

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from .scheduler_env import HPCEnv
-from .test_env import TestEnv
+from .scheduler_simulator import HPCSchedulingSimulator
+from .gym_env import GymSchedulerEnv
 
 __all__ = [
-    'HPCEnv',
-    'TestEnv',
+    'HPCSchedulingSimulator',
+    'GymSchedulerEnv',
 ]

@@ -23,7 +23,7 @@ JOB_SLOTS = 5
 
 NUMBER_OF_PROCESSORS = 128
 
-TRACE_FILE = os.path.join("./sched_env/dataset/HPC2N-2002-2.2-cln.swf")
+TRACE_FILE = os.path.join("./dataset/HPC2N-2002-2.2-cln.swf")
 
 SWF_WORKLOAD = {
     'tracefile': TRACE_FILE,

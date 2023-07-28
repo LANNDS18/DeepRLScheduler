@@ -11,7 +11,7 @@ The present dissertation project seeks to address the problem of optimizing High
 
 ## Preliminary Training Performance Test on different devices
 
-Access this preliminary research on performance on different platforms via [training performance test](training_performance_test) folder. 
+Access this preliminary research on performance on different platforms via [training performance test](Documentation/legacy/training_performance_test) folder. 
  a DDPG agent with the architecture [512, 256, 64, 32] for both actor and critic networks implemented by PyTorch2.0 is trained in the ’PENDULUM’ environment on OpenAI-Gym. The training devices used for performance comparison are Crrius, Archer2 and MacBook Pro M1 16GB.
 
 #### Preliminary Research Dependencies

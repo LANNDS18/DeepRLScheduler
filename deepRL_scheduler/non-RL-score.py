@@ -1,47 +1,47 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
-from sched_env.env import HPCEnv
-from sched_env.job_scorer import JobScorer
+import numpy as np
+
+from sched_env.env import GymSchedulerEnv
+from sched_env.scorer import Obs_Scorer
 
 
-def schedule_curr_sequence_reset(_env, score_fn):
+def schedule_curr_sequence_reset(_env, score_fn, log=True):
     """schedule the sequence of jobs using heuristic algorithm."""
 
-    _env.heuristic_reset()
-    scheduled_logs = {}
+    job_queue_obs = _env.reset()[0]
 
     while True:
-        not_empty, scheduled_logs = _env.heuristic_step(score_fn, scheduled_logs)
-        if not not_empty:
+
+        action, min_value = min(enumerate(job_queue_obs), key=lambda pair: score_fn(pair[1]))
+        obs, rwd, done, info = _env.step(action)
+        job_queue_obs = obs[0]
+
+        if done:
+            record = info['performance matrix']
+            current_time = info['current_timestamp']
             break
+    if log:
+        print(f"Current Time Stamp: {current_time}")
+        print(f'total performance matrix value: {sum(record.values())}')
+    return rwd
 
-    scheduled_logs = _env.scorer.post_process_matrices(scheduled_logs, _env.num_job_in_batch,
-                                                       _env.current_timestamp, _env.loads[_env.start],
-                                                       _env.loads.max_procs)
 
-    _env.heuristic_reset()
+def evaluate_score_fn(workload, score_fn, n_round=10, seed=0):
+    env = GymSchedulerEnv(workload_file=workload,
+                          batch_job_slice=140000,
+                          back_fill=False,
+                          seed=seed)
 
-    return scheduled_logs
+    rewards = []
+    for i in range(n_round):
+        rewards.append(schedule_curr_sequence_reset(env, score_fn=score_fn, log=False))
+    print(np.mean(rewards))
 
 
 if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--workload', type=str, default="./dataset/HPC2N-2002-2.2-cln.swf")  # RICC-2010-2
-    args = parser.parse_args()
-    current_dir = os.getcwd()
-    workload_file = os.path.join(current_dir, args.workload)
-
-    env = HPCEnv(batch_job_slice=700, back_fill=False, seed=0)
-    env.load_job_trace(workload_file=workload_file)
-
-    env.reset()
-
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.sjf_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.fcfs_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.smallest_score).values()))
-    print(sum(schedule_curr_sequence_reset(env, JobScorer.f1_score).values()))
-
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.sjf_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.fcfs_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.smallest_score)
+    evaluate_score_fn("./dataset/HPC2N-2002-2.2-cln.swf", Obs_Scorer.f1_score)
