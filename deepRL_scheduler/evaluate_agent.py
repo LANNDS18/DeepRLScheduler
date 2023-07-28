@@ -5,7 +5,7 @@ import json
 
 from stable_baselines3 import PPO
 
-from sched_env.env import GymSchedulerEnv
+from hpc_rl_simulator.env import GymSchedulerEnv
 from train_ppo import init_dir_from_args
 
 

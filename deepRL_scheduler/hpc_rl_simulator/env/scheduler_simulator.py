@@ -12,6 +12,7 @@ from ..cluster import Cluster
 from ..job import Job
 from ..scorer import ScheduleScorer
 from ..workload import Workloads
+from ..utils import display_message
 
 from .env_conf import *
 
@@ -36,7 +37,8 @@ class HPCSchedulingSimulator(ABC):
                  skip=False,
                  job_score_type=0,
                  trace_sample_range=None,
-                 seed=0):
+                 seed=0,
+                 quiet=False):
 
         super(HPCSchedulingSimulator, self).__init__()
 
@@ -45,6 +47,7 @@ class HPCSchedulingSimulator(ABC):
         self.trace_sample_range = np.array(trace_sample_range) if trace_sample_range else None
         self.np_random = None
         self.seed(seed)
+        self.quiet = quiet
 
         self.penalty_job_score = None
 
@@ -86,9 +89,17 @@ class HPCSchedulingSimulator(ABC):
         """
         Loads the job trace from the given file. Initialises the cluster and sets the penalty job score.
         """
-        print(f":ENV:\tloading workloads from dataset: {workload_file}")
+        display_message(f":ENV:\tloading workloads from dataset: {workload_file}", self.quiet)
         self.loads.parse_swf(workload_file)
         self.cluster = Cluster(self.loads.max_nodes, self.loads.max_procs / self.loads.max_nodes)
+        display_message(
+            f":WORKLOAD:\tMax Allocated Processors: {self.loads.max_allocated_proc}\n"
+            f":WORKLOAD:\tmax node: {self.loads.max_nodes}\n"
+            f":WORKLOAD:\tmax procs: {self.loads.max_procs}\n"
+            f":WORKLOAD:\tmax execution time: {self.loads.max_exec_time}\n"
+            f":WORKLOAD:\tnumber of jobs: {self.loads.size}\n",
+            self.quiet
+        )
 
     def fill_pre_workloads(self, size: int):
         """

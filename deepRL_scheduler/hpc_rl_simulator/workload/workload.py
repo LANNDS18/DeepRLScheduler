@@ -30,8 +30,6 @@ class Workloads:
 
     def parse_swf(self, path):
 
-        end_time = 0
-
         with open(path) as fp:
             for line in fp:
                 if line.startswith(";"):
@@ -72,14 +70,6 @@ class Workloads:
         if self.max_procs == 0:
             self.max_procs = self.max_nodes
 
-        print(
-            f":WORKLOAD:\tMax Allocated Processors: {self.max_allocated_proc}\n"
-            f":WORKLOAD:\tmax node: {self.max_nodes}\n"
-            f":WORKLOAD:\tmax procs: {self.max_procs}\n"
-            f":WORKLOAD:\tmax execution time: {self.max_exec_time}\n"
-            f":WORKLOAD:\tnumber of jobs: {self.size}\n"
-        )
-
         self.all_jobs.sort(key=lambda job: job.job_id)
 
     def reset(self):
@@ -89,12 +79,3 @@ class Workloads:
     def __getitem__(self, item):
         return self.all_jobs[item]
 
-
-if __name__ == "__main__":
-    print("Loading the workloads...")
-    load = Workloads()
-    load.parse_swf('../../dataset/NASA-iPSC-1993-3.1-cln.swf')
-    print("Finish loading the workloads...", type(load[0]))
-    print(load.max_nodes, load.max_procs)
-    print(load[0].__feature__())
-    print(load[1].__feature__())

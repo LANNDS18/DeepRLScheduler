@@ -38,11 +38,8 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  skip=False,
                  job_score_type=0,
                  trace_sample_range=None,
-                 seed=0):
-
-        self.flatten_observation = flatten_observation
-        self.done = False
-        self.passed_step = 0
+                 seed=0,
+                 quiet=True):
 
         HPCSchedulingSimulator.__init__(self,
                                         workload_file=workload_file,
@@ -50,8 +47,13 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                                         skip=skip,
                                         job_score_type=job_score_type,
                                         trace_sample_range=trace_sample_range,
-                                        seed=seed
+                                        seed=seed,
+                                        quiet=quiet
                                         )
+
+        self.flatten_observation = flatten_observation
+        self.done = False
+        self.passed_step = 0
 
         self.action_space = spaces.Discrete(MAX_QUEUE_SIZE)
         self.observation_space = None

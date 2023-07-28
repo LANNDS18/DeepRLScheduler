@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import math
+import warnings
 
 import numpy as np
 
@@ -59,7 +60,7 @@ class Cluster:
         if allocated == request_node:
             return allocated_nodes
 
-        print("Error in allocation, there are enough free resources but can not allocated!")
+        warnings.warn("Error in allocation, there are enough free resources but can not allocated!")
         return []
 
     def release(self, releases):

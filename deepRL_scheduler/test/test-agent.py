@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-from sched_env.env import GymSchedulerEnv
+from deepRL_scheduler.hpc_rl_simulator.env import GymSchedulerEnv
 
 if __name__ == '__main__':
     import argparse

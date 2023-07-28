@@ -16,8 +16,6 @@ class Job:
         self.average_cpu_time_used = float(s_array[5])
         self.used_memory = int(s_array[6])
 
-        # "requested number of processors" and "number of allocated processors" are typically mixed.
-        # I do not know their difference clearly. But it seems to me using a larger one will be sufficient.
         self.request_number_of_processors = int(s_array[7])
         self.number_of_allocated_processors = max(self.number_of_allocated_processors,
                                                   self.request_number_of_processors)
@@ -25,19 +23,9 @@ class Job:
 
         self.request_number_of_nodes = -1
 
-        # if we use the job's request time field
-        # for model, request_time might be empty. In this case, we set request_time to the run_time
         self.request_time = int(s_array[8])
         if self.request_time == -1:
             self.request_time = self.run_time
-
-        # if we use the run time as the most accurate request time
-        # self.request_time = self.run_time + 60
-        # if we gradually increase the accuracy of job's request time
-        # with a percentage wrong estimation and round to a fixed time: 1,2,3,... hours.
-        # this.requestTime = (int) (this.runTime + this.runTime * 0.4);
-        # int roundsTo = 60 * 60; //round up to hours
-        # this.requestTime = (this.requestTime / roundsTo + 1) * roundsTo;
 
         self.request_memory = int(s_array[9])
         self.status = int(s_array[10])

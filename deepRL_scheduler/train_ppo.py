@@ -3,8 +3,8 @@ import json
 
 from stable_baselines3 import PPO
 
-from sched_env.agent import CustomActorCriticPolicy, available_models
-from sched_env.env import GymSchedulerEnv
+from hpc_rl_simulator.agent import CustomActorCriticPolicy, available_models
+from hpc_rl_simulator.env import GymSchedulerEnv
 
 
 def init_env(workload_path, config):

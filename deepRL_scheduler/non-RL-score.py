@@ -3,8 +3,8 @@
 
 import numpy as np
 
-from sched_env.env import GymSchedulerEnv
-from sched_env.scorer import Obs_Scorer
+from hpc_rl_simulator.env import GymSchedulerEnv
+from hpc_rl_simulator.scorer import Obs_Scorer
 
 
 def schedule_curr_sequence_reset(_env, score_fn, log=True):
