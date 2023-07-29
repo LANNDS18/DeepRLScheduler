@@ -1,34 +1,10 @@
-import os
 import json
 
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.agent import CustomActorCriticPolicy, available_models
+from hpc_rl_simulator.utils import init_dir_from_args, init_training_env
 from hpc_rl_simulator.env import GymSchedulerEnv
-
-
-def init_env(workload_path, config):
-    customEnv = GymSchedulerEnv(
-        flatten_observation=True,
-        workload_file=workload_path,
-        skip=config['skip'],
-        job_score_type=config['score_type'],
-        trace_sample_range=config['trace_sample_range'],
-    )
-    return customEnv
-
-
-def init_dir_from_args(config):
-    score_type_dict = {0: 'bsld', 1: 'wait_time', 2: 'turnaround_time', 3: 'resource_utilization'}
-    workload_name = config['workload'].split('/')[-1].split('.')[0]
-    current_dir = os.getcwd()
-
-    workload_file = os.path.join(current_dir, config['workload'])
-    log_data_dir = os.path.join(current_dir, config['log_dir'])
-    model_dir = config['model_dir'] + '/' + score_type_dict[config['score_type']] + '/' + workload_name
-    print(model_dir)
-    return model_dir, log_data_dir, workload_file
-
 
 if __name__ == '__main__':
 
@@ -38,12 +14,16 @@ if __name__ == '__main__':
     # init directories
     model_dir, log_data_dir, workload_file = init_dir_from_args(config)
     # create environment
-    env = init_env(workload_file, config)
+    env = init_training_env(workload_file, GymSchedulerEnv, config)
     if config['trained_model']:
         model = PPO.load(config['trained_model'], env=env)
     else:
         if config['actor_model'] in available_models and config['critic_model'] in available_models:
-            policy_args = {'attn': False, 'actor_model': config['actor_model'], 'critic_model': config['critic_model']}
+            policy_args = {
+                'attn': False,
+                'actor_model': config['actor_model'],
+                'critic_model': config['critic_model']
+            }
         else:
             print(
                 f"Invalid model name: {config['actor_model']} or {config['critic_model']} "

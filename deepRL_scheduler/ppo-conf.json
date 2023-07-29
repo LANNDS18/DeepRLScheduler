@@ -22,6 +22,6 @@
     "score_type": 0,
     "trace_sample_range": [0, 0.5],
     "actor_model": "kernel",
-    "critic_model": "critic_lg",
+    "critic_model": "critic_linear_large",
     "use_cluster_feature": false
 }

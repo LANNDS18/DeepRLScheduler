@@ -8,6 +8,7 @@ import numpy as np
 
 from gym import spaces
 from abc import ABC
+from typing import Tuple, List
 
 from .scheduler_simulator import HPCSchedulingSimulator
 from .env_conf import *
@@ -32,14 +33,17 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
     """
 
     def __init__(self,
-                 workload_file,
-                 flatten_observation=False,
-                 back_fill=False,
-                 skip=False,
-                 job_score_type=0,
-                 trace_sample_range=None,
-                 seed=0,
-                 quiet=True):
+                 workload_file: str,
+                 flatten_observation: bool = False,
+                 back_fill: bool = False,
+                 skip: bool = False,
+                 job_score_type: int = 0,
+                 trace_sample_range: List = None,
+                 seed: int = 0,
+                 quiet: bool = True,
+                 customized_trace_len_range: Tuple = None,
+                 use_fixed_job_sequence: bool = False,
+                 ):
 
         HPCSchedulingSimulator.__init__(self,
                                         workload_file=workload_file,
@@ -54,6 +58,8 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.flatten_observation = flatten_observation
         self.done = False
         self.passed_step = 0
+        self.use_fixed_job_sequence = use_fixed_job_sequence
+        self.customized_trace_len_range = customized_trace_len_range
 
         self.action_space = spaces.Discrete(MAX_QUEUE_SIZE)
         self.observation_space = None
@@ -313,7 +319,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             observation: A vector containing the initial state of the job queue and the cluster.
         """
 
-        self.reset_simulator()
+        self.reset_simulator(self.use_fixed_job_sequence, self.customized_trace_len_range)
         self.build_observation_space()
 
         self.done = False

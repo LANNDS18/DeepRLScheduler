@@ -30,9 +30,12 @@ def schedule_curr_sequence_reset(_env, score_fn, log=True):
 
 def evaluate_score_fn(workload, score_fn, n_round=10, seed=0):
     env = GymSchedulerEnv(workload_file=workload,
-                          trace_sample_range=[0, 0.5],
+                          trace_sample_range=[0, 0.9],
                           back_fill=False,
-                          seed=seed)
+                          seed=seed,
+                          use_fixed_job_sequence=True,
+                          customized_trace_len_range=(2000, 8000)
+                          )
 
     rewards = []
     for i in range(n_round):

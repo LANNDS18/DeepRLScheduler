@@ -76,7 +76,6 @@ class HPCSchedulingSimulator(ABC):
         self.pre_workloads = []
 
         self._load_job_trace(workload_file)
-        self.reset_simulator()
 
     def seed(self, seed=None):
         """
@@ -366,7 +365,7 @@ class HPCSchedulingSimulator(ABC):
             done = self.process_job_queue()
             return done
 
-    def reset_simulator(self):
+    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None):
         """
         Resets the simulation environment by resetting the cluster and the loads, and initializing various
         instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
@@ -389,20 +388,30 @@ class HPCSchedulingSimulator(ABC):
         self.num_job_in_batch = 0
         self.scheduled_rl = {}
         self.pivot_job = False
-
-        job_sequence_size = self.np_random.randint(MIN_JOB_SEQUENCE_SIZE, MAX_JOB_SEQUENCE_SIZE)
-
         self.pre_workloads = []
 
-        assert self.trace_sample_range is None or \
-               np.all(np.logical_and(self.trace_sample_range >= 0, self.trace_sample_range <= 1))
+        min_index, max_index = customized_trace_len_range if customized_trace_len_range is not None \
+            else (MIN_JOB_SEQUENCE_SIZE, MAX_JOB_SEQUENCE_SIZE)
 
-        if self.trace_sample_range is None:
-            self.start = self.np_random.randint(job_sequence_size, (self.loads.size - job_sequence_size - 1))
+        if not use_fixed_job_sequence:
+            job_sequence_size = self.np_random.randint(min_index, max_index)
+            assert self.trace_sample_range is None or \
+                np.all(np.logical_and(self.trace_sample_range >= 0, self.trace_sample_range <= 1))
+
+            if self.trace_sample_range is None:
+                self.start = self.np_random.randint(job_sequence_size, (self.loads.size - job_sequence_size - 1))
+            else:
+                start, end = (self.loads.size * self.trace_sample_range).astype(int)
+                assert end - start >= job_sequence_size + 1
+                self.start = self.np_random.randint(start, (end - job_sequence_size - 1))
         else:
-            start, end = (self.loads.size * self.trace_sample_range).astype(int)
-            assert end - start >= job_sequence_size + 1
-            self.start = self.np_random.randint(start, (end - job_sequence_size - 1))
+            job_sequence_size = int((min_index + max_index)/2)
+            if self.trace_sample_range is None:
+                self.start = 0
+            else:
+                start, end = (self.loads.size * self.trace_sample_range).astype(int)
+                assert end - start >= job_sequence_size + 1
+                self.start = end - job_sequence_size - 1
 
         self.start_idx_last_reset = self.start
         self.next_arriving_job_idx = self.start + 1

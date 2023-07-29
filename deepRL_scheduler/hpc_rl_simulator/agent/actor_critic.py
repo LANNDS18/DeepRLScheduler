@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from functools import partial
 
 import numpy as np
@@ -23,11 +26,10 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
         self.custom_kwargs = {
             'actor_model': kwargs.pop('actor_model', 'kernel'),
-            'critic_model': kwargs.pop('critic_model', 'critic_lg'),
-            'attn': kwargs.pop('attn', False)
+            'critic_model': kwargs.pop('critic_model', 'critic_linear_large'),
+            'attn': kwargs.pop('attn', False),
+            'obs_shape': observation_space.shape
         }
-
-        print(self.custom_kwargs)
 
         # call parent constructor
         super(CustomActorCriticPolicy, self).__init__(
@@ -52,7 +54,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
     def get_actions(self, latent_pi, mask, deterministic=False, ret_dist=False, sample=True):
         """Sample actions from the policy"""
-        actions = torch.squeeze(self.action_output(latent_pi)) + (mask - 1) * 1000000
+        actions = torch.squeeze(self.action_net(latent_pi)) + (mask - 1) * 1000000
         distribution = Categorical(logits=actions)
         if sample:
             actions = torch.argmax(distribution.probs) if deterministic else distribution.sample()
@@ -74,7 +76,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
                                                  deterministic=False,
                                                  ret_dist=True)
         # Evaluate the values for the given observations
-        values = torch.flatten(self.value_output(latent_value))
+        values = torch.flatten(self.value_net(latent_value))
         log_prob = distribution.log_prob(actions)
         actions = actions.reshape((-1, *self.action_space.shape))
         return actions, values, log_prob
@@ -97,7 +99,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
                                            sample=False,
                                            ret_dist=True)
 
-        values = torch.flatten(self.value_output(latent_value))
+        values = torch.flatten(self.value_net(latent_value))
         log_prob = distribution.log_prob(actions)
         entropy = distribution.entropy()
 
@@ -120,13 +122,13 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
     def _build(self, lr_schedule) -> None:
         """
         Create the networks and the optimizer.
-        :param lr_schedule: Learning rate schedule
-            lr_schedule(1) is the initial learning rate
+        Parameters:
+            lr_schedule: Learning rate schedule lr_schedule(1) is the initial learning rate
         """
 
         self._build_mlp_extractor()
-        self.action_output = self.build_actor_output()
-        self.value_output = self.build_value_output()
+        self.action_net = self.build_actor_output()
+        self.value_net = self.build_value_output()
 
         # Init weights: use orthogonal initialization
         # with small initial weight for the output
@@ -134,8 +136,8 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
             module_gains = {
                 self.features_extractor: np.sqrt(2),
                 self.mlp_extractor: np.sqrt(2),
-                self.action_output: 0.01,
-                self.value_output: 1,
+                self.action_net: 0.01,
+                self.value_net: 1,
             }
 
             for module, gain in module_gains.items():
