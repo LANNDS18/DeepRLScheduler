@@ -19,27 +19,28 @@ def schedule_curr_sequence_reset(_env, score_fn, log=True):
         job_queue_obs = obs[0]
 
         if done:
-            record = info['performance matrix']
+            record = info['performance_score']
             current_time = info['current_timestamp']
             break
     if log:
         print(f"Current Time Stamp: {current_time}")
-        print(f'total performance matrix value: {sum(record.values())}')
-    return rwd
+        print(f'total performance matrix value: {record}')
+    return record
 
 
-def evaluate_score_fn(workload, score_fn, n_round=10, seed=0):
-    env = GymSchedulerEnv(workload_file=workload,
-                          trace_sample_range=[0, 0.9],
-                          back_fill=False,
-                          seed=seed,
-                          use_fixed_job_sequence=True,
-                          customized_trace_len_range=(2000, 8000)
-                          )
+def evaluate_score_fn(workload, score_fn, n_round=1, seed=0):
+    env = GymSchedulerEnv(
+        workload_file=workload,
+        trace_sample_range=[0.95, 1.0],
+        back_fill=False,
+        seed=seed,
+        use_fixed_job_sequence=True,
+        customized_trace_len_range=(0, 1000)  # (0 + 10000) /2 = 5000
+    )
 
     rewards = []
     for i in range(n_round):
-        rewards.append(schedule_curr_sequence_reset(env, score_fn=score_fn, log=False))
+        rewards.append(schedule_curr_sequence_reset(env, score_fn=score_fn, log=True))
     print(np.mean(rewards))
 
 

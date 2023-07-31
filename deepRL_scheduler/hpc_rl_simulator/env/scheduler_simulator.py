@@ -4,6 +4,7 @@
 import sys
 
 from abc import ABC
+from typing import Optional
 
 import numpy as np
 from gym.utils import seeding
@@ -34,7 +35,6 @@ class HPCSchedulingSimulator(ABC):
     def __init__(self,
                  workload_file,
                  back_fill=False,
-                 skip=False,
                  job_score_type=0,
                  trace_sample_range=None,
                  seed=0,
@@ -43,7 +43,6 @@ class HPCSchedulingSimulator(ABC):
         super(HPCSchedulingSimulator, self).__init__()
 
         self.back_fill = back_fill
-        self.skip = skip
         self.trace_sample_range = np.array(trace_sample_range) if trace_sample_range else None
         self.np_random = None
         self.seed(seed)
@@ -71,11 +70,12 @@ class HPCSchedulingSimulator(ABC):
         self.scorer = ScheduleScorer(job_score_type)
 
         self.scheduled_rl = {}
-        self.pivot_job = False
         self.enable_pre_workloads = False
         self.pre_workloads = []
 
         self._load_job_trace(workload_file)
+
+        self.scheduled_a_job = False
 
     def seed(self, seed=None):
         """
@@ -182,6 +182,8 @@ class HPCSchedulingSimulator(ABC):
 
         self.scheduled_rl[job.job_id] = score
         self.job_queue.remove(job)
+
+        self.scheduled_a_job = True
 
     def check_next_release(self) -> tuple[float, list]:
         """
@@ -309,11 +311,7 @@ class HPCSchedulingSimulator(ABC):
             next_release_time, next_release_machines = self.check_next_release()
 
         if self.next_arriving_job_idx >= self.last_job_in_batch and not self.running_jobs:
-            if not self.pivot_job:
-                self.pivot_job = True
-                return False
-            else:
-                return True
+            return True
 
         if next_time_after_skip < min(self.loads[self.next_arriving_job_idx].submit_time, next_release_time):
             self.current_timestamp = next_time_after_skip
@@ -330,13 +328,13 @@ class HPCSchedulingSimulator(ABC):
             self.running_jobs.pop(0)
         return False
 
-    def check_then_schedule(self, action: int) -> bool:
+    def check_then_schedule(self, job: Optional[Job]) -> bool:
         """
         Check the legality and internal transition of provided action then call corresponding functions.
 
         Parameters:
-        action: int
-            The index of visible job in queue to be scheduled.
+        action: job
+            The job to be scheduled.
 
         Returns:
             bool:
@@ -344,12 +342,6 @@ class HPCSchedulingSimulator(ABC):
             False if the simulation has not completed.
         """
 
-        if 0 <= action <= MAX_QUEUE_SIZE - 1:
-            action = action
-        else:
-            action = MAX_QUEUE_SIZE - 1
-
-        job = self.obs_transitions[action].get_job()
         if not job:
             done = self.noop_schedule()
             return done
@@ -387,7 +379,6 @@ class HPCSchedulingSimulator(ABC):
         self.last_job_in_batch = 0
         self.num_job_in_batch = 0
         self.scheduled_rl = {}
-        self.pivot_job = False
         self.pre_workloads = []
 
         min_index, max_index = customized_trace_len_range if customized_trace_len_range is not None \

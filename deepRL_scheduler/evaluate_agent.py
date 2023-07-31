@@ -21,14 +21,14 @@ def schedule_curr_sequence_reset(_env, model, log=True):
         obs, rwd, done, info = _env.step(action)
 
         if done:
-            record = info['performance matrix']
+            record = info['performance_score']
             current_time = info['current_timestamp']
             break
 
     if log:
         print(f"Current Time Stamp: {current_time}")
-        print(f'total performance matrix value: {sum(record.values())}')
-    return rwd
+        print(f'total performance matrix value: {record}')
+    return record
 
 
 with open('ppo-conf.json', 'r') as f:
@@ -42,13 +42,13 @@ if __name__ == '__main__':
     env = GymSchedulerEnv(
         workload_file="./dataset/HPC2N-2002-2.2-cln.swf",
         flatten_observation=True,
-        trace_sample_range=[0, 0.9],
+        trace_sample_range=[0.95, 1.0],
         back_fill=False,
         seed=0,
         use_fixed_job_sequence=True,
-        customized_trace_len_range=(2000, 8000)
+        customized_trace_len_range=(0, 1000)  # (0 + 10000) /2 = 5000
     )
 
     for i in range(1):
-        model = PPO.load("./trained_models/bsld/HPC2N-2002-2ppo_HPC.zip", env=env)
+        model = PPO.load("trained_models/reward_space_experiment/HPC2N-2002-2ppo_HPC_small_reward.zip", env=env)
         print(schedule_curr_sequence_reset(env, model, False))

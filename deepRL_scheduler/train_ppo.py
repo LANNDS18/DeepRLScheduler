@@ -3,7 +3,7 @@ import json
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.agent import CustomActorCriticPolicy, available_models
-from hpc_rl_simulator.utils import init_dir_from_args, init_training_env
+from hpc_rl_simulator.utils import init_dir_from_args, init_training_env, EvalCallback, init_evaluation_env
 from hpc_rl_simulator.env import GymSchedulerEnv
 
 if __name__ == '__main__':
@@ -20,7 +20,6 @@ if __name__ == '__main__':
     else:
         if config['actor_model'] in available_models and config['critic_model'] in available_models:
             policy_args = {
-                'attn': False,
                 'actor_model': config['actor_model'],
                 'critic_model': config['critic_model']
             }
@@ -51,6 +50,10 @@ if __name__ == '__main__':
         )
         env_steps = config['rollout_steps'] * config['num_rollouts']
         print(":AGENT-PPO: Learning")
-        model.learn(total_timesteps=400000)
-        model.save(f"{model_dir}ppo_HPC")
+
+        eval_env = init_evaluation_env(workload_file, GymSchedulerEnv, config)
+        eval_callback = EvalCallback(eval_env)
+
+        model.learn(total_timesteps=400000, callback=[eval_callback])
+        model.save(f"{model_dir}_ppo_HPC")
         print(f":AGENT-PPO: Trained model saved at: {model_dir}ppo_HPC")
