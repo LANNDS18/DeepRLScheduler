@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,21 +9,41 @@ from torch.nn.functional import relu, softmax
 
 from ..env.scheduler_simulator import JOB_FEATURES, MAX_QUEUE_SIZE
 
-available_models = ['kernel',
-                    'conv',
-                    'critic_lg',
-                    'critic_un_lg',
-                    'critic_un',
-                    'critic_sm']
+available_models = ['actor_kernel',
+                    'actor_conv',
+                    'actor_kernel_attention',
+                    'actor_mlp',
+                    'critic_linear_large',
+                    'critic_linear_deep',
+                    'critic_linear_small']
+
+
+class Kernel_Attention_Policy(nn.Module):
+    def __init__(self, latent_dim_pi):
+        super(Kernel_Attention_Policy, self).__init__()
+        self.query_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
+        self.key_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
+        self.value_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
+        self.attn_layer = nn.MultiheadAttention(embed_dim=32, num_heads=4)
+        self.fc1 = nn.Linear(in_features=32, out_features=16)
+        self.fc2 = nn.Linear(in_features=16, out_features=latent_dim_pi)
+
+    def forward(self, x_jobs):
+        queries = relu(self.query_layer(x_jobs))
+        keys = relu(self.key_layer(x_jobs))
+        values = relu(self.value_layer(x_jobs))
+        output, _ = self.attn_layer(queries, keys, values)
+        x_emb = softmax(output, dim=1)
+        x_emb = relu(self.fc1(x_emb))
+        x = relu(self.fc2(x_emb))
+        return x
 
 
 class PPOTorchModels(nn.Module):
     """Custom model for PPO"""
 
-    def __init__(self, actor_model, critic_model, attn):
-        """ Initialize the custom model
-        :param actor_model: (str) the name of the actor model
-        :param critic_model: (str) the name of the critic model"""
+    def __init__(self, actor_model, critic_model, obs_shape):
+        """ Initialize the custom model"""
 
         super(PPOTorchModels, self).__init__()
         self.actor_model = actor_model
@@ -28,12 +51,15 @@ class PPOTorchModels(nn.Module):
         self.m = int(np.sqrt(MAX_QUEUE_SIZE))
         self.latent_dim_pi = JOB_FEATURES
         self.latent_dim_vf = JOB_FEATURES
-        self.attn = attn
+        self.obs_shape = obs_shape
+        self.cluster_size = self.obs_shape[0] - MAX_QUEUE_SIZE * JOB_FEATURES
 
-        self.attn_layer = MultiheadAttention(JOB_FEATURES - 1, 1, batch_first=True)
+        self.attn_layer = MultiheadAttention(JOB_FEATURES - 1 + self.latent_dim_pi, 1, batch_first=True)
 
-        self.kernel_net = nn.Sequential(
-            nn.Linear(in_features=JOB_FEATURES - 1, out_features=32),
+        self.actor_kernel = nn.Sequential(
+            nn.Linear(in_features=(JOB_FEATURES - 1) + self.latent_dim_pi, out_features=64),
+            nn.ReLU(),
+            nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
             nn.Linear(in_features=32, out_features=16),
             nn.ReLU(),
@@ -41,38 +67,12 @@ class PPOTorchModels(nn.Module):
             nn.ReLU()
         )
 
-        self.lenet = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=1, padding='same'),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=1, padding='same'),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Flatten(),
-            nn.Linear(in_features=16, out_features=self.latent_dim_pi)
-        )
+        self.actor_kernel_attention = Kernel_Attention_Policy(self.latent_dim_pi)
 
-        self.critic_lg1 = nn.Sequential(
-            nn.Linear(in_features=JOB_FEATURES - 1, out_features=32),
+        self.critic_linear_encoder_large = nn.Sequential(
+            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=128),
             nn.ReLU(),
-            nn.Linear(in_features=32, out_features=16),
-            nn.ReLU(),
-            nn.Linear(in_features=16, out_features=8),
-            nn.ReLU(),
-            nn.Linear(in_features=8, out_features=1)
-        )
-
-        self.critic_lg2 = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE, out_features=64),
-            nn.ReLU(),
-            nn.Linear(in_features=64, out_features=32),
-            nn.ReLU(),
-            nn.Linear(in_features=32, out_features=self.latent_dim_vf),
-            nn.ReLU()
-        )
-
-        self.critic_un_lg = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1), out_features=128),
+            nn.Linear(in_features=128, out_features=128),
             nn.ReLU(),
             nn.Linear(in_features=128, out_features=128),
             nn.ReLU(),
@@ -81,10 +81,14 @@ class PPOTorchModels(nn.Module):
             nn.Linear(in_features=128, out_features=self.latent_dim_vf)
         )
 
-        self.critic_un = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1), out_features=32),
+        self.cluster_encoder = nn.Sequential(
+            nn.Linear(in_features=self.cluster_size, out_features=self.latent_dim_pi)
+        )
+
+        self.critic_linear_encoder_deep = nn.Sequential(
+            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=64),
             nn.ReLU(),
-            nn.Linear(in_features=32, out_features=32),
+            nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
             nn.Linear(in_features=32, out_features=32),
             nn.ReLU(),
@@ -95,8 +99,10 @@ class PPOTorchModels(nn.Module):
             nn.Linear(in_features=32, out_features=self.latent_dim_vf)
         )
 
-        self.critic_sm = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1), out_features=32),
+        self.critic_linear_encoder_small = nn.Sequential(
+            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=64),
+            nn.ReLU(),
+            nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
             nn.Linear(in_features=32, out_features=16),
             nn.ReLU(),
@@ -106,22 +112,26 @@ class PPOTorchModels(nn.Module):
         )
 
         self.models = {
-            'kernel': self.kernel_net,
-            'conv': self.lenet,
-            'critic_lg': [self.critic_lg1, self.critic_lg2],
-            'critic_un_lg': self.critic_un_lg,
-            'critic_un': self.critic_un,
-            'critic_sm': self.critic_sm,
+            'actor_kernel': self.actor_kernel,
+            'actor_kernel_attention': self.actor_kernel_attention,
+            'critic_linear_large': self.critic_linear_encoder_large,
+            'critic_linear_deep': self.critic_linear_encoder_deep,
+            'critic_linear_small': self.critic_linear_encoder_small,
         }
+
+        self.display_model_name()
 
     @staticmethod
     def list_models():
         return available_models
 
+    def display_model_name(self):
+        print(f'Actor Model: {self.actor_model}, Critic Model: {self.critic_model}')
+
     def forward(self, observation):
         """Forward pass for both actor and critic"""
-        pi, mask = self.forward_actor(observation)
-        return pi, mask, self.forward_critic(observation)
+        pi = self.forward_actor(observation)
+        return pi, self.forward_critic(observation)
 
     def forward_actor(self, x):
         """Forward pass for actor
@@ -129,33 +139,22 @@ class PPOTorchModels(nn.Module):
             x (torch.Tensor): input tensor
         Returns:
             torch.Tensor: output tensor"""
-        x_job = x[:, :JOB_FEATURES * MAX_QUEUE_SIZE]
+        x_jobs = x[:, :-self.cluster_size]
+        x_cluster = x[:, -self.cluster_size:]
 
-        x_cluster = x[:, JOB_FEATURES * MAX_QUEUE_SIZE:]
-
-        if self.actor_model == 'conv':
-            x = torch.reshape(x_job, (-1, self.m, self.m, JOB_FEATURES))
-            x = self.models[self.actor_model](x)
-        elif self.actor_model in ['kernel', 'attn']:
-            x = x_job.reshape(-1, MAX_QUEUE_SIZE, JOB_FEATURES)
-            mask = x[:, :, -1]
+        if self.actor_model in ['actor_kernel', 'actor_kernel_attention']:
+            x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE, JOB_FEATURES))
+            mask = x_jobs[:, :, -1]
             mask = mask.squeeze()
-            x = x[:, :, :-1]
-            if self.attn:
-                queries = relu(nn.Linear(in_features=JOB_FEATURES - 1, out_features=32)(x))
-                keys = relu(nn.Linear(in_features=JOB_FEATURES - 1, out_features=32)(x))
-                values = relu(nn.Linear(in_features=JOB_FEATURES - 1, out_features=32)(x))
-                output = self.attn_layer(queries, keys, values)[0]
-                x = softmax(output, dim=1)
-                x = relu(nn.Linear(in_features=x.shape[-1], out_features=16)(x))
-                x = relu(nn.Linear(in_features=16, out_features=self.latent_dim_pi)(x))
-            else:
-                x = self.models[self.actor_model](x)
+            x_jobs = x_jobs[:, :, :-1]
+            x_cluster = self.cluster_encoder(x_cluster)
+            x_cluster = x_cluster.unsqueeze(1).repeat(1, x_jobs.shape[1], 1)
+            x_concat = torch.concat((x_jobs, x_cluster), dim=2)
+            x = self.models[self.actor_model](x_concat)
             return x, mask
+
         else:
             raise NotImplementedError(f'Actor model: {self.actor_model} not implemented')
-
-        return x
 
     def forward_critic(self, x):
         """Forward pass for critic
@@ -163,17 +162,15 @@ class PPOTorchModels(nn.Module):
             x (torch.Tensor): input tensor
         Returns:
             torch.Tensor: output tensor"""
-        x_reshape = x[:, :JOB_FEATURES * MAX_QUEUE_SIZE]
+        x_jobs = x[:, :-self.cluster_size]
+        x_cluster = x[:, -self.cluster_size:]
 
-        if not self.critic_model == 'critic_lg':
-            x = torch.reshape(x_reshape, shape=(-1, MAX_QUEUE_SIZE, JOB_FEATURES))
-            x = x[:, :, :-1]
-            x = torch.reshape(x, shape=(-1, MAX_QUEUE_SIZE * (JOB_FEATURES - 1)))
-            x = self.models[self.critic_model](x)
-        else:
-            x = x_reshape.reshape(-1, MAX_QUEUE_SIZE, JOB_FEATURES)
-            x = x[:, :, :-1]
-            x = self.models[self.critic_model][0](x)
-            x = torch.squeeze(x, dim=2)
-            x = self.models[self.critic_model][1](x)
+        x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE, JOB_FEATURES))
+        x_jobs = x_jobs[:, :, :-1]
+        x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE * (JOB_FEATURES - 1)))
+
+        x_cluster = torch.reshape(x_cluster, shape=(-1, self.cluster_size))
+        x_concat = torch.cat((x_jobs, x_cluster), dim=-1)
+        x = self.models[self.critic_model](x_concat)
+
         return x

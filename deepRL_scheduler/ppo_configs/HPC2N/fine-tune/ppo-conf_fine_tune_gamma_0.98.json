@@ -1,8 +1,8 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
-    "model_dir": "./trained_models/actor_attention",
-    "log_dir": "./data/logs/HPC2N",
-    "gamma": 0.99,
+    "model_dir": "./trained_models/optimal_gamma_0.98",
+    "log_dir": "./data/logs/HPC2N/optimal_gamma_0.98",
+    "gamma": 0.98,
     "gae_lambda": 0.95,
     "seed": 0,
     "verbose": 2,
@@ -18,6 +18,6 @@
     "backfil": 0,
     "score_type": 0,
     "trace_sample_range": [0, 0.5],
-    "actor_model": "actor_kernel_attention",
+    "actor_model": "actor_kernel",
     "critic_model": "critic_linear_large"
 }
