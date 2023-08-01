@@ -25,9 +25,8 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """Initialize the policy based on Stable Baselines' ActorCriticPolicy"""
 
         self.custom_kwargs = {
-            'actor_model': kwargs.pop('actor_model', 'kernel'),
+            'actor_model': kwargs.pop('actor_model', 'actor_kernel'),
             'critic_model': kwargs.pop('critic_model', 'critic_linear_large'),
-            'attn': kwargs.pop('attn', False),
             'obs_shape': observation_space.shape
         }
 
@@ -54,7 +53,7 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
 
     def get_actions(self, latent_pi, mask, deterministic=False, ret_dist=False, sample=True):
         """Sample actions from the policy"""
-        actions = torch.squeeze(self.action_net(latent_pi)) + (mask - 1) * 1000000
+        actions = torch.squeeze(self.action_net(latent_pi)) + (mask - 1)
         distribution = Categorical(logits=actions)
         if sample:
             actions = torch.argmax(distribution.probs) if deterministic else distribution.sample()
@@ -70,7 +69,8 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """
         # Preprocess the observation if needed
         features = self.extract_features(obs)
-        latent_pi, mask, latent_value = self.mlp_extractor(features)
+        latent_pi, mask = self.mlp_extractor.forward_actor(features)
+        latent_value = self.mlp_extractor.forward_critic(features)
         actions, distribution = self.get_actions(latent_pi,
                                                  mask=mask,
                                                  deterministic=False,
@@ -92,7 +92,8 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """
 
         features = self.extract_features(obs)
-        latent_pi, mask, latent_value = self.mlp_extractor(features)
+        latent_pi, mask = self.mlp_extractor.forward_actor(features)
+        latent_value = self.mlp_extractor.forward_critic(features)
 
         _, distribution = self.get_actions(latent_pi,
                                            mask,

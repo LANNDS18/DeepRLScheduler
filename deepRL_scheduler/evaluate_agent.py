@@ -6,7 +6,7 @@ import json
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.env import GymSchedulerEnv
-from train_ppo import init_dir_from_args
+from hpc_rl_simulator.utils import init_dir_from_args, init_evaluation_env
 
 
 def schedule_curr_sequence_reset(_env, model, log=True):
@@ -39,16 +39,8 @@ if __name__ == '__main__':
     # init directories
     model_dir, log_data_dir, workload_file = init_dir_from_args(config)
     # create environment
-    env = GymSchedulerEnv(
-        workload_file="./dataset/HPC2N-2002-2.2-cln.swf",
-        flatten_observation=True,
-        trace_sample_range=[0.95, 1.0],
-        back_fill=False,
-        seed=0,
-        use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 1000)  # (0 + 10000) /2 = 5000
-    )
+    env = init_evaluation_env(workload_file, GymSchedulerEnv, config, True)
 
     for i in range(1):
-        model = PPO.load("trained_models/reward_space_experiment/HPC2N-2002-2ppo_HPC_small_reward.zip", env=env)
-        print(schedule_curr_sequence_reset(env, model, False))
+        model = PPO.load("trained_models/bsld/HPC2N-2002-2_ppo_HPC_optimal_1.zip", env=env)
+        print(schedule_curr_sequence_reset(env, model, log=True))

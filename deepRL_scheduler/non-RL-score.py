@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import json
+
 import numpy as np
 
 from hpc_rl_simulator.env import GymSchedulerEnv
 from hpc_rl_simulator.scorer import Obs_Scorer
+from hpc_rl_simulator.utils import init_evaluation_env
 
 
 def schedule_curr_sequence_reset(_env, score_fn, log=True):
@@ -28,15 +31,11 @@ def schedule_curr_sequence_reset(_env, score_fn, log=True):
     return record
 
 
-def evaluate_score_fn(workload, score_fn, n_round=1, seed=0):
-    env = GymSchedulerEnv(
-        workload_file=workload,
-        trace_sample_range=[0.95, 1.0],
-        back_fill=False,
-        seed=seed,
-        use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 1000)  # (0 + 10000) /2 = 5000
-    )
+def evaluate_score_fn(workload, score_fn, n_round=1):
+    with open('ppo-conf.json', 'r') as f:
+        config = json.load(f)
+
+    env = init_evaluation_env(workload, GymSchedulerEnv, config, flatten_state_space=False)
 
     rewards = []
     for i in range(n_round):

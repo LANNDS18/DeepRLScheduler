@@ -1,6 +1,6 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
-    "model_dir": "./trained_models",
+    "model_dir": "./trained_models/reward_func",
     "log_dir": "./data/logs/HPC2N",
     "gamma": 0.99,
     "gae_lambda": 0.95,
@@ -8,20 +8,16 @@
     "verbose": 2,
     "device": "cpu",
     "rollout_steps": 5000,
-    "lr": 0.0003,
-    "num_rollouts": 100,
+    "lr": 0.0001,
+    "batch_size": 100,
     "clip_range": 0.2,
-    "epochs": 4000,
+    "epochs": 10,
     "trained_model": null,
     "stats_window_size": 5,
     "target_kl": 0.01,
-    "attn": false,
-    "shuffle": 0,
     "backfil": 0,
-    "skip": 0,
     "score_type": 0,
     "trace_sample_range": [0, 0.5],
-    "actor_model": "kernel",
-    "critic_model": "critic_linear_large",
-    "use_cluster_feature": false
+    "actor_model": "actor_kernel",
+    "critic_model": "critic_linear_large"
 }

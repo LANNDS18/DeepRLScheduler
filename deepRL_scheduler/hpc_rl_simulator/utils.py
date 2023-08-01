@@ -2,9 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import os
-from typing import Optional, Union
+from typing import Optional
 
-import gym
 import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
@@ -12,13 +11,12 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecEnv
 
 def evaluate_policy(
         model,
-        env: Union[gym.Env, VecEnv],
+        env,
         n_eval_episodes: int = 1,
         deterministic: bool = True,
         reward_threshold: Optional[float] = None,
         return_episode_rewards: bool = False,
 ):
-
     if not isinstance(env, VecEnv):
         env = DummyVecEnv([lambda: env])
 
@@ -73,8 +71,14 @@ class EvalCallback(BaseCallback):
         self._eval_env = eval_env
         self._eval_env.reset()
         self._eval_episodes = eval_episodes
+        self.ignore_first_call = True
 
     def _on_rollout_start(self):
+        # avoid evaluate first call
+        if self.ignore_first_call:
+            self.ignore_first_call = False
+            return True
+
         mean_reward, reward_std, performance_score = evaluate_policy(
             self.model,
             self._eval_env,
@@ -103,19 +107,17 @@ def display_message(message: str, quiet: bool) -> None:
         print(message)
 
 
-def init_evaluation_env(workload_path, ENV, config):
+def init_evaluation_env(workload_path, ENV, config, flatten_state_space=True):
     customEnv = ENV(
-        flatten_observation=True,
+        flatten_observation=flatten_state_space,
         trace_sample_range=[0.5, 1.0],
         workload_file=workload_path,
-        skip=config['skip'],
         job_score_type=config['score_type'],
         quiet=True,
         seed=config['seed'],
         use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 20000)
+        customized_trace_len_range=(0, 10000)
     )
-    customEnv = DummyVecEnv([lambda: customEnv])
     return customEnv
 
 
@@ -123,7 +125,6 @@ def init_training_env(workload_path, ENV, config):
     customEnv = ENV(
         flatten_observation=True,
         workload_file=workload_path,
-        skip=config['skip'],
         job_score_type=config['score_type'],
         trace_sample_range=config['trace_sample_range'],
         quiet=False
@@ -153,3 +154,24 @@ def extract_custom_kwargs(**kwargs):
         else:
             filtered_kwargs[key] = kwargs[key]
     return custom_kwargs, filtered_kwargs
+
+
+def lr_linear_schedule(initial_value: float):
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func

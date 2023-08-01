@@ -3,12 +3,12 @@ import json
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.agent import CustomActorCriticPolicy, available_models
-from hpc_rl_simulator.utils import init_dir_from_args, init_training_env, EvalCallback, init_evaluation_env
+from hpc_rl_simulator.utils import init_dir_from_args, init_training_env, EvalCallback, init_evaluation_env, lr_linear_schedule
 from hpc_rl_simulator.env import GymSchedulerEnv
 
 if __name__ == '__main__':
 
-    with open('ppo-conf.json', 'r') as f:
+    with open('ppo-conf_attention_network.json', 'r') as f:
         config = json.load(f)
 
     # init directories
@@ -33,8 +33,9 @@ if __name__ == '__main__':
         model = PPO(
             CustomActorCriticPolicy,
             env,
-            learning_rate=config['lr'],
+            learning_rate=lr_linear_schedule(config['lr']),
             n_steps=config['rollout_steps'],
+            batch_size=config['batch_size'],
             n_epochs=config['epochs'],
             gamma=config['gamma'],
             gae_lambda=config['gae_lambda'],
@@ -48,7 +49,7 @@ if __name__ == '__main__':
             seed=config['seed'],
             device=config['device'],
         )
-        env_steps = config['rollout_steps'] * config['num_rollouts']
+        env_steps = config['rollout_steps'] * config['batch_size']
         print(":AGENT-PPO: Learning")
 
         eval_env = init_evaluation_env(workload_file, GymSchedulerEnv, config)

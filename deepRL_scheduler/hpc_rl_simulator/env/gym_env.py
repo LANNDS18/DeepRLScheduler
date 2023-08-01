@@ -36,7 +36,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  workload_file: str,
                  flatten_observation: bool = False,
                  back_fill: bool = False,
-                 skip: bool = False,
                  job_score_type: int = 0,
                  trace_sample_range: List = None,
                  seed: int = 0,
@@ -48,7 +47,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         HPCSchedulingSimulator.__init__(self,
                                         workload_file=workload_file,
                                         back_fill=back_fill,
-                                        skip=skip,
                                         job_score_type=job_score_type,
                                         trace_sample_range=trace_sample_range,
                                         seed=seed,
@@ -64,6 +62,8 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.action_space = spaces.Discrete(MAX_QUEUE_SIZE)
         self.observation_space = None
         self.build_observation_space()
+        self.episode_performance_matrix_score = 0.0
+        self.num_step = 0
 
     def build_observation_space(self):
         """
@@ -196,18 +196,15 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
              normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
              normalized_executable_id, can_schedule_now, 1])
 
-    def _skip_features(self) -> JobTransition:
+    @staticmethod
+    def _skip_features() -> JobTransition:
         """
-        Returns a JobTransition object representing the features of a skipped job. If 'pivot_job'
-        is True, the last feature is set to 0, otherwise it is set to 1.
+        Returns a JobTransition object representing the features of a skipped job.
 
         Returns:
             JobTransition: A JobTransition object representing the features of a skipped job.
         """
-        if self.pivot_job:
-            return JobTransition.from_list([None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0])
-        else:
-            return JobTransition.from_list([None, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0])
+        return JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1])
 
     def build_cluster_state(self) -> np.ndarray:
         """
@@ -259,17 +256,17 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             if i < len(self.visible_jobs):
                 job = self.visible_jobs[i]
                 self.obs_transitions.append(self._job_features(job))
-            elif self.skip and not add_skip:
+            elif not add_skip:
                 add_skip = True
                 self.obs_transitions.append(self._skip_features())
             else:
-                self.obs_transitions.append(JobTransition.from_list([None, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0]))
+                self.obs_transitions.append(JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0]))
 
         vector = np.vstack(np.array([pair.to_list() for pair in self.obs_transitions]), dtype='float32')
 
         return vector
 
-    def get_reward(self) -> float:
+    def get_reward(self, job, eps=1e-6) -> float:
 
         """
         Uses the 'post_process_matrices' method from the scorer to process the 'scheduled_rl' and obtain a reward for
@@ -279,12 +276,24 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             rl_total (float): The total reward, calculated as the negative sum of individual job rewards.
         """
 
-        complete_job_reward = self.scorer.post_process_matrices(copy.copy(self.scheduled_rl),
+        complete_job_matrix = self.scorer.post_process_matrices(copy.copy(self.scheduled_rl),
                                                                 self.current_timestamp,
                                                                 self.loads[self.start],
                                                                 self.loads.max_procs)
 
-        rl_total = -sum(complete_job_reward.values())
+        rl_total = -sum(complete_job_matrix.values())
+        if not self.done:
+            # rl_total /= len(self.scheduled_rl) - eps  # small reward experiment
+            rl_total = rl_total - eps  # normal reward experiment
+            # rl_total = -eps  # episode reward
+            if self.scheduled_a_job:
+                rl_total = max(rl_total, rl_total / 2)
+            if job.real_flag:
+                rl_total = max(rl_total, rl_total / 2)
+        else:
+            self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
+            rl_total = eps
+
         return rl_total
 
     def get_observation(self) -> np.ndarray:
@@ -325,6 +334,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.done = False
         self.passed_step = 0
         observation = self.get_observation()
+        self.num_step = 0
 
         return observation
 
@@ -347,8 +357,16 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                 additional_info (dict): A dictionary containing the current timestamp and the performance matrix.
         """
 
-        self.done = self.check_then_schedule(a)
-        reward = self.get_reward()
+        if 0 <= a <= MAX_QUEUE_SIZE - 1:
+            action = a
+        else:
+            action = MAX_QUEUE_SIZE - 1
+
+        job = self.obs_transitions[action].get_job()
+        self.scheduled_a_job = False
+        self.done = self.check_then_schedule(job)
+        self.num_step += 1
+        reward = self.get_reward(self.obs_transitions[action])
         observation = self.get_observation()
 
         return [
@@ -357,5 +375,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
             self.done,
             {'current_timestamp': self.current_timestamp,
              'performance matrix': self.scheduled_rl,
-             'start': self.start}
+             'performance_score': self.episode_performance_matrix_score,
+             'start': self.start,
+             'job': job}
         ]
