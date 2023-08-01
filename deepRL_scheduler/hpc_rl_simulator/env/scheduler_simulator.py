@@ -13,7 +13,7 @@ from ..cluster import Cluster
 from ..job import Job
 from ..scorer import ScheduleScorer
 from ..workload import Workloads
-from ..utils import display_message
+from ..common import display_message
 
 from .env_conf import *
 
@@ -76,6 +76,7 @@ class HPCSchedulingSimulator(ABC):
         self._load_job_trace(workload_file)
 
         self.scheduled_a_job = False
+        self.n_reset_simulator = 0
 
     def seed(self, seed=None):
         """
@@ -357,7 +358,7 @@ class HPCSchedulingSimulator(ABC):
             done = self.process_job_queue()
             return done
 
-    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None):
+    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None, step_size=0.1):
         """
         Resets the simulation environment by resetting the cluster and the loads, and initializing various
         instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
@@ -387,22 +388,34 @@ class HPCSchedulingSimulator(ABC):
         if not use_fixed_job_sequence:
             job_sequence_size = self.np_random.randint(min_index, max_index)
             assert self.trace_sample_range is None or \
-                np.all(np.logical_and(self.trace_sample_range >= 0, self.trace_sample_range <= 1))
+                   np.all(np.logical_and(self.trace_sample_range >= 0, self.trace_sample_range <= 1))
 
             if self.trace_sample_range is None:
-                self.start = self.np_random.randint(job_sequence_size, (self.loads.size - job_sequence_size - 1))
+                self.start = self.np_random.randint(0, (self.loads.size - job_sequence_size - 1))
             else:
                 start, end = (self.loads.size * self.trace_sample_range).astype(int)
                 assert end - start >= job_sequence_size + 1
                 self.start = self.np_random.randint(start, (end - job_sequence_size - 1))
         else:
-            job_sequence_size = int((min_index + max_index)/2)
+            job_sequence_size = int((min_index + max_index) / 2)
             if self.trace_sample_range is None:
-                self.start = 0
+                self.start = min([job_sequence_size * self.n_reset_simulator, self.loads.size - job_sequence_size])
             else:
-                start, end = (self.loads.size * self.trace_sample_range).astype(int)
+
+                start, end = (self.loads.size * self.trace_sample_range).astype(int) + job_sequence_size
+
+                move_start = int(min([start * (1 + step_size * self.n_reset_simulator),
+                                      self.loads.size - job_sequence_size]))
+
+                move_end = move_start + job_sequence_size + 1
+
+                if move_end <= end and move_end - move_start >= job_sequence_size + 1:
+                    start = move_start
+                else:
+                    start = end - job_sequence_size - 1
                 assert end - start >= job_sequence_size + 1
-                self.start = end - job_sequence_size - 1
+
+                self.start = start
 
         self.start_idx_last_reset = self.start
         self.next_arriving_job_idx = self.start + 1
@@ -410,5 +423,6 @@ class HPCSchedulingSimulator(ABC):
         self.last_job_in_batch = self.start + self.num_job_in_batch
         self.current_timestamp = self.loads[self.start].submit_time
         self.job_queue.append(self.loads[self.start])
+        self.n_reset_simulator += 1
 
         self.fill_pre_workloads(job_sequence_size + self.np_random.randint(job_sequence_size))

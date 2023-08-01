@@ -7,7 +7,7 @@ import numpy as np
 
 from hpc_rl_simulator.env import GymSchedulerEnv
 from hpc_rl_simulator.scorer import Obs_Scorer
-from hpc_rl_simulator.utils import init_evaluation_env
+from hpc_rl_simulator.common import init_evaluation_env
 
 
 def schedule_curr_sequence_reset(_env, score_fn, log=True):
@@ -31,7 +31,7 @@ def schedule_curr_sequence_reset(_env, score_fn, log=True):
     return record
 
 
-def evaluate_score_fn(workload, score_fn, n_round=1):
+def evaluate_score_fn(workload, score_fn, n_round=5):
     with open('ppo-conf.json', 'r') as f:
         config = json.load(f)
 

@@ -1,14 +1,18 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import json
 
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.agent import CustomActorCriticPolicy, available_models
-from hpc_rl_simulator.utils import init_dir_from_args, init_training_env, EvalCallback, init_evaluation_env, lr_linear_schedule
+from hpc_rl_simulator.common import init_dir_from_args, init_training_env,\
+    EvalCallback, init_evaluation_env, lr_linear_schedule
 from hpc_rl_simulator.env import GymSchedulerEnv
 
 if __name__ == '__main__':
 
-    with open('ppo-conf_attention_network.json', 'r') as f:
+    with open('ppo_configs/HPC2N/fine-tune/ppo-conf_optimal_fine_tune_1.json', 'r') as f:
         config = json.load(f)
 
     # init directories
@@ -16,6 +20,7 @@ if __name__ == '__main__':
     # create environment
     env = init_training_env(workload_file, GymSchedulerEnv, config)
     if config['trained_model']:
+        print(f"load model from {config['trained_model']}")
         model = PPO.load(config['trained_model'], env=env)
     else:
         if config['actor_model'] in available_models and config['critic_model'] in available_models:
@@ -53,8 +58,8 @@ if __name__ == '__main__':
         print(":AGENT-PPO: Learning")
 
         eval_env = init_evaluation_env(workload_file, GymSchedulerEnv, config)
-        eval_callback = EvalCallback(eval_env)
+        eval_callback = EvalCallback(eval_env, save_path=f"{model_dir}_ppo_best")
 
         model.learn(total_timesteps=400000, callback=[eval_callback])
-        model.save(f"{model_dir}_ppo_HPC")
-        print(f":AGENT-PPO: Trained model saved at: {model_dir}ppo_HPC")
+        model.save(f"{model_dir}_ppo")
+        print(f":AGENT-PPO: Trained model saved at: {model_dir}_ppo")

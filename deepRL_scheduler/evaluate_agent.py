@@ -3,10 +3,11 @@
 
 import json
 
+import numpy as np
 from stable_baselines3 import PPO
 
 from hpc_rl_simulator.env import GymSchedulerEnv
-from hpc_rl_simulator.utils import init_dir_from_args, init_evaluation_env
+from hpc_rl_simulator.common import init_dir_from_args, init_evaluation_env
 
 
 def schedule_curr_sequence_reset(_env, model, log=True):
@@ -40,7 +41,11 @@ if __name__ == '__main__':
     model_dir, log_data_dir, workload_file = init_dir_from_args(config)
     # create environment
     env = init_evaluation_env(workload_file, GymSchedulerEnv, config, True)
+    n_round = 5
+    scores = []
 
-    for i in range(1):
-        model = PPO.load("trained_models/bsld/HPC2N-2002-2_ppo_HPC_optimal_1.zip", env=env)
-        print(schedule_curr_sequence_reset(env, model, log=True))
+    for i in range(n_round):
+        model = PPO.load("trained_models/fine-tune-models/gamma_0.99/bsld/HPC2N-2002-2_ppo.zip", env=env)
+        scores. append(schedule_curr_sequence_reset(env, model, log=True))
+
+    print(np.mean(scores))
