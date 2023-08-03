@@ -65,7 +65,7 @@ def evaluate_policy(
 
 
 class EvalCallback(BaseCallback):
-    def __init__(self, eval_env, eval_episodes=1, verbose=0, early_stop_tolerance=10, save_path='./data/logs'):
+    def __init__(self, eval_env, eval_episodes=5, verbose=0, early_stop_tolerance=10, save_path='./data/logs'):
         super(EvalCallback, self).__init__(verbose)
         self._eval_env = eval_env
         self._eval_env.reset()
@@ -90,6 +90,8 @@ class EvalCallback(BaseCallback):
             n_eval_episodes=self._eval_episodes
         )
 
+        self._eval_env.n_reset_simulator = 0
+
         self.early_stop_count += 1
         if performance_score >= self.best_record:
             self.early_stop_count = 0
@@ -99,7 +101,6 @@ class EvalCallback(BaseCallback):
 
         print(f"Evaluation: mean reward = {mean_reward}, std reward = {reward_std}")
         self.logger.record("eval/evaluation_env_mean_reward", mean_reward)
-        self.logger.record("eval/evaluation_env_std_reward", reward_std)
         self.logger.record("eval/performance matrix", performance_score)
 
         if self.early_stop_count >= self.early_stop_tolerance:

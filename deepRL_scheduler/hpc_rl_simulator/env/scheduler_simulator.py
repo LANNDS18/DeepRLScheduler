@@ -334,7 +334,7 @@ class HPCSchedulingSimulator(ABC):
         Check the legality and internal transition of provided action then call corresponding functions.
 
         Parameters:
-        action: job
+        Job: job or None
             The job to be scheduled.
 
         Returns:

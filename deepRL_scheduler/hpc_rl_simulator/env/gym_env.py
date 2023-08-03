@@ -141,7 +141,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
     def _job_features(self, job: Job, epsilon: float = 1e-6) -> JobTransition:
         """
         Extracts and normalizes the features of a given job. If a feature value is not available
-        (denoted by -1), it is set to 1. If the job fits in the cluster, the 'can_schedule_now' feature is set to 1,
+        (denoted by -1), it is set to -1. If the job fits in the cluster, the 'can_schedule_now' feature is set to 1,
         otherwise it is set to 0.
 
         Parameters:
