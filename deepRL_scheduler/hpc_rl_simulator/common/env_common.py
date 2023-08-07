@@ -13,7 +13,7 @@ def init_evaluation_env(workload_path, ENV, config, flatten_state_space=True):
         quiet=True,
         seed=config['seed'],
         use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 4000)
+        customized_trace_len_range=(0, 10000)
     )
     return customEnv
 

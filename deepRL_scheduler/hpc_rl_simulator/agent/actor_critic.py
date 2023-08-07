@@ -47,13 +47,13 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """Get the action and the value for a given observation"""
         # Preprocess the observation if needed
         features = self.extract_features(observation)
-        latent_pi, mask = self.mlp_extractor.forward_actor(features)
-        actions = self.get_actions(latent_pi, mask, deterministic=deterministic)
+        latent_pi = self.mlp_extractor.forward_actor(features)
+        actions = self.get_actions(latent_pi, deterministic=deterministic)
         return actions
 
-    def get_actions(self, latent_pi, mask, deterministic=False, ret_dist=False, sample=True):
+    def get_actions(self, latent_pi, deterministic=False, ret_dist=False, sample=True):
         """Sample actions from the policy"""
-        actions = torch.squeeze(self.action_net(latent_pi)) + (mask - 1)
+        actions = torch.squeeze(self.action_net(latent_pi))
         distribution = Categorical(logits=actions)
         if sample:
             actions = torch.argmax(distribution.probs) if deterministic else distribution.sample()
@@ -69,10 +69,9 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """
         # Preprocess the observation if needed
         features = self.extract_features(obs)
-        latent_pi, mask = self.mlp_extractor.forward_actor(features)
-        latent_value = self.mlp_extractor.forward_critic(features)
+        latent_pi = self.mlp_extractor.forward_actor(features)  # 1, 128, 1
+        latent_value = self.mlp_extractor.forward_critic(features) # 1, 11
         actions, distribution = self.get_actions(latent_pi,
-                                                 mask=mask,
                                                  deterministic=False,
                                                  ret_dist=True)
         # Evaluate the values for the given observations
@@ -92,11 +91,10 @@ class CustomActorCriticPolicy(ActorCriticPolicy):
         """
 
         features = self.extract_features(obs)
-        latent_pi, mask = self.mlp_extractor.forward_actor(features)
+        latent_pi = self.mlp_extractor.forward_actor(features)
         latent_value = self.mlp_extractor.forward_critic(features)
 
         _, distribution = self.get_actions(latent_pi,
-                                           mask,
                                            sample=False,
                                            ret_dist=True)
 

@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import MultiheadAttention
 from torch.nn.functional import relu, softmax
 
 from ..env.scheduler_simulator import JOB_FEATURES, MAX_QUEUE_SIZE
@@ -21,17 +19,17 @@ available_models = ['actor_kernel',
 class Kernel_Attention_Policy(nn.Module):
     def __init__(self, latent_dim_pi):
         super(Kernel_Attention_Policy, self).__init__()
-        self.query_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
-        self.key_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
-        self.value_layer = nn.Linear(in_features=(JOB_FEATURES - 1) + latent_dim_pi, out_features=32)
+        self.query_layer = nn.Linear(in_features=JOB_FEATURES + latent_dim_pi, out_features=32)
+        self.key_layer = nn.Linear(in_features=JOB_FEATURES + latent_dim_pi, out_features=32)
+        self.value_layer = nn.Linear(in_features=JOB_FEATURES + latent_dim_pi, out_features=32)
         self.attn_layer = nn.MultiheadAttention(embed_dim=32, num_heads=4)
         self.fc1 = nn.Linear(in_features=32, out_features=16)
         self.fc2 = nn.Linear(in_features=16, out_features=latent_dim_pi)
 
-    def forward(self, x_jobs):
-        queries = relu(self.query_layer(x_jobs))
-        keys = relu(self.key_layer(x_jobs))
-        values = relu(self.value_layer(x_jobs))
+    def forward(self, x_concat):
+        queries = relu(self.query_layer(x_concat))
+        keys = relu(self.key_layer(x_concat))
+        values = relu(self.value_layer(x_concat))
         output, _ = self.attn_layer(queries, keys, values)
         x_emb = softmax(output, dim=1)
         x_emb = relu(self.fc1(x_emb))
@@ -48,16 +46,15 @@ class PPOTorchModels(nn.Module):
         super(PPOTorchModels, self).__init__()
         self.actor_model = actor_model
         self.critic_model = critic_model
-        self.m = int(np.sqrt(MAX_QUEUE_SIZE))
+
         self.latent_dim_pi = JOB_FEATURES
         self.latent_dim_vf = JOB_FEATURES
+
         self.obs_shape = obs_shape
         self.cluster_size = self.obs_shape[0] - MAX_QUEUE_SIZE * JOB_FEATURES
 
-        self.attn_layer = MultiheadAttention(JOB_FEATURES - 1 + self.latent_dim_pi, 1, batch_first=True)
-
         self.actor_kernel = nn.Sequential(
-            nn.Linear(in_features=(JOB_FEATURES - 1) + self.latent_dim_pi, out_features=64),
+            nn.Linear(in_features=JOB_FEATURES + self.latent_dim_pi, out_features=64),
             nn.ReLU(),
             nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
@@ -70,7 +67,7 @@ class PPOTorchModels(nn.Module):
         self.actor_kernel_attention = Kernel_Attention_Policy(self.latent_dim_pi)
 
         self.critic_linear_encoder_large = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=128),
+            nn.Linear(in_features=MAX_QUEUE_SIZE * JOB_FEATURES + self.cluster_size, out_features=128),
             nn.ReLU(),
             nn.Linear(in_features=128, out_features=128),
             nn.ReLU(),
@@ -86,7 +83,7 @@ class PPOTorchModels(nn.Module):
         )
 
         self.critic_linear_encoder_deep = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=64),
+            nn.Linear(in_features=MAX_QUEUE_SIZE * JOB_FEATURES + self.cluster_size, out_features=64),
             nn.ReLU(),
             nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
@@ -100,7 +97,7 @@ class PPOTorchModels(nn.Module):
         )
 
         self.critic_linear_encoder_small = nn.Sequential(
-            nn.Linear(in_features=MAX_QUEUE_SIZE * (JOB_FEATURES - 1) + self.cluster_size, out_features=64),
+            nn.Linear(in_features=MAX_QUEUE_SIZE * JOB_FEATURES + self.cluster_size, out_features=64),
             nn.ReLU(),
             nn.Linear(in_features=64, out_features=32),
             nn.ReLU(),
@@ -144,15 +141,11 @@ class PPOTorchModels(nn.Module):
 
         if self.actor_model in ['actor_kernel', 'actor_kernel_attention']:
             x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE, JOB_FEATURES))
-            mask = x_jobs[:, :, -1]
-            mask = mask.squeeze()
-            x_jobs = x_jobs[:, :, :-1]
             x_cluster = self.cluster_encoder(x_cluster)
             x_cluster = x_cluster.unsqueeze(1).repeat(1, x_jobs.shape[1], 1)
             x_concat = torch.concat((x_jobs, x_cluster), dim=2)
             x = self.models[self.actor_model](x_concat)
-            return x, mask
-
+            return x
         else:
             raise NotImplementedError(f'Actor model: {self.actor_model} not implemented')
 
@@ -164,10 +157,6 @@ class PPOTorchModels(nn.Module):
             torch.Tensor: output tensor"""
         x_jobs = x[:, :-self.cluster_size]
         x_cluster = x[:, -self.cluster_size:]
-
-        x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE, JOB_FEATURES))
-        x_jobs = x_jobs[:, :, :-1]
-        x_jobs = torch.reshape(x_jobs, shape=(-1, MAX_QUEUE_SIZE * (JOB_FEATURES - 1)))
 
         x_cluster = torch.reshape(x_cluster, shape=(-1, self.cluster_size))
         x_concat = torch.cat((x_jobs, x_cluster), dim=-1)

@@ -5,8 +5,8 @@ MAX_QUEUE_SIZE = 128
 
 MAX_WAIT_TIME = 12 * 60 * 60  # assume maximal wait time is 12 hours.
 
-# each job has 11 features
-JOB_FEATURES = 11
+# each job has 10 features
+JOB_FEATURES = 10
 # skip 60 seconds
 SKIP_TIME = 60
 

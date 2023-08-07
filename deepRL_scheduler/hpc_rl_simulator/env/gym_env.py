@@ -180,12 +180,6 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         else:
             normalized_group_id = min(float(job.group_id) / float(self.loads.max_group_id), 1.0 - epsilon)
 
-        if job.executable_number == -1:
-            normalized_executable_id = 1
-        else:
-            normalized_executable_id = min(
-                float(job.executable_number) / float(self.loads.max_executable_number), 1.0 - epsilon)
-
         if self.cluster.fits(job):
             can_schedule_now = 1.0 - epsilon
         else:
@@ -194,7 +188,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         return JobTransition.from_list(
             [job, normalized_submit_time, normalized_wait_time, normalized_request_time, normalized_run_time,
              normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
-             normalized_executable_id, can_schedule_now, 1])
+             can_schedule_now, 1])
 
     @staticmethod
     def _skip_features() -> JobTransition:
@@ -204,7 +198,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         Returns:
             JobTransition: A JobTransition object representing the features of a skipped job.
         """
-        return JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1])
+        return JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1])
 
     def build_cluster_state(self) -> np.ndarray:
         """
@@ -260,7 +254,7 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                 add_skip = True
                 self.obs_transitions.append(self._skip_features())
             else:
-                self.obs_transitions.append(JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0]))
+                self.obs_transitions.append(JobTransition.from_list([None, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0]))
 
         vector = np.vstack(np.array([pair.to_list() for pair in self.obs_transitions]), dtype='float32')
 
@@ -280,21 +274,22 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                                                                 self.current_timestamp,
                                                                 self.loads[self.start],
                                                                 self.loads.max_procs)
+        gamma = 50
 
         rl_total = -sum(complete_job_matrix.values())
-        if not self.done:
+        if not self.done and job.real_flag:
             # rl_total /= len(self.scheduled_rl) - eps  # small reward experiment
-            rl_total = rl_total - eps  # normal reward experiment
-            # rl_total = -eps  # episode reward
-            if self.scheduled_a_job:
-                rl_total = max(rl_total, rl_total / 2)
-            if job.real_flag:
-                rl_total = max(rl_total, rl_total / 2)
+            # rl_total = rl_total - eps  # normal reward experiment
+            # rl_total = -eps  # episode
+            # if job.real_flag:
+            # rl_total = max(rl_total, rl_total / 4) # reward scaling
+
+            reward = np.exp(rl_total/gamma) / (1 + np.exp(rl_total/gamma))
         else:
             self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
-            rl_total = eps
+            reward = 0 - eps
 
-        return rl_total
+        return reward
 
     def get_observation(self) -> np.ndarray:
         """

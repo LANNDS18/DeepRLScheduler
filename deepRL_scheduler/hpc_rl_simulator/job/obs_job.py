@@ -12,7 +12,6 @@ class Obs_Job:
                  normalized_request_memory,
                  normalized_user_id,
                  normalized_group_id,
-                 normalized_executable_id,
                  can_schedule_now,
                  real_flag):
         self.normalized_submit_time = normalized_submit_time
@@ -24,7 +23,6 @@ class Obs_Job:
         self.normalized_request_memory = normalized_request_memory
         self.normalized_user_id = normalized_user_id
         self.normalized_group_id = normalized_group_id
-        self.normalized_executable_id = normalized_executable_id
         self.can_schedule_now = can_schedule_now
         self.real_flag = real_flag
 
@@ -42,7 +40,6 @@ class Obs_Job:
                 self.normalized_request_memory,
                 self.normalized_user_id,
                 self.normalized_group_id,
-                self.normalized_executable_id,
                 self.can_schedule_now,
                 self.real_flag]
 
@@ -50,10 +47,10 @@ class Obs_Job:
 class JobTransition(Obs_Job):
     def __init__(self, job, normalized_submit_time, normalized_wait_time, normalized_request_time, normalized_run_time,
                  normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
-                 normalized_executable_id, can_schedule_now, real_flag):
+                 can_schedule_now, real_flag):
         super().__init__(normalized_submit_time, normalized_wait_time, normalized_request_time, normalized_run_time,
                          normalized_request_procs, normalized_request_memory, normalized_user_id, normalized_group_id,
-                         normalized_executable_id, can_schedule_now, real_flag)
+                         can_schedule_now, real_flag)
         self.job = job
 
     def get_job(self):

@@ -311,8 +311,15 @@ class HPCSchedulingSimulator(ABC):
         if self.running_jobs:
             next_release_time, next_release_machines = self.check_next_release()
 
-        if self.next_arriving_job_idx >= self.last_job_in_batch and not self.running_jobs:
-            return True
+        if self.next_arriving_job_idx >= self.last_job_in_batch:
+            if not self.running_jobs:
+                return True
+            else:
+                self.current_timestamp = next_time_after_skip
+                self.current_timestamp = max(self.current_timestamp, next_release_time)
+                self.cluster.release(next_release_machines)
+                self.running_jobs.pop(0)
+                return False
 
         if next_time_after_skip < min(self.loads[self.next_arriving_job_idx].submit_time, next_release_time):
             self.current_timestamp = next_time_after_skip
@@ -358,7 +365,7 @@ class HPCSchedulingSimulator(ABC):
             done = self.process_job_queue()
             return done
 
-    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None, step_size=0.1):
+    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None, reset_num=50):
         """
         Resets the simulation environment by resetting the cluster and the loads, and initializing various
         instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
@@ -401,11 +408,11 @@ class HPCSchedulingSimulator(ABC):
             if self.trace_sample_range is None:
                 self.start = min([job_sequence_size * self.n_reset_simulator, self.loads.size - job_sequence_size])
             else:
+                start, end = (self.loads.size * self.trace_sample_range).astype(int)
 
-                start, end = (self.loads.size * self.trace_sample_range).astype(int) + job_sequence_size
+                start_ratio = (end - job_sequence_size - 1 - start) / reset_num
 
-                move_start = int(min([start * (1 + step_size * self.n_reset_simulator),
-                                      self.loads.size - job_sequence_size]))
+                move_start = int(min([start + start_ratio * self.n_reset_simulator, end - job_sequence_size - 1]))
 
                 move_end = move_start + job_sequence_size + 1
 
