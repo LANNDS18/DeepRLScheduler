@@ -13,7 +13,9 @@ def init_evaluation_env(workload_path, ENV, config, flatten_state_space=True):
         quiet=True,
         seed=config['seed'],
         use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 20000)
+        customized_trace_len_range=(0, 20000),
+        reward=config['reward'],
+        k=config['reward_k'],
     )
     return customEnv
 
@@ -27,7 +29,9 @@ def init_validation_env(workload_path, ENV, config, flatten_state_space=True):
         quiet=True,
         seed=config['seed'],
         use_fixed_job_sequence=True,
-        customized_trace_len_range=(0, 10000)
+        customized_trace_len_range=(0, 10000),
+        reward=config['reward'],
+        k=config['reward_k'],
     )
     return customEnv
 
@@ -40,6 +44,8 @@ def init_training_env(workload_path, ENV, config):
         trace_sample_range=config['trace_sample_range'],
         quiet=False,
         seed=config['seed'],
+        reward=config['reward'],
+        k=config['reward_k'],
     )
     return customEnv
 
@@ -53,7 +59,9 @@ def init_vec_training_env(workload_path, ENV, config, n_envs=3):
             job_score_type=config['score_type'],
             trace_sample_range=config['trace_sample_range'],
             quiet=False if i == 0 else True,
-            seed=config['seed'] + i
+            seed=config['seed'] + i,
+            reward=config['reward'],
+            k=config['reward_k'],
         )
         env_list.append(customEnv)
     envs = DummyVecEnv(

@@ -42,6 +42,8 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                  quiet: bool = True,
                  customized_trace_len_range: Tuple = None,
                  use_fixed_job_sequence: bool = False,
+                 reward=2,
+                 k=100,
                  ):
 
         HPCSchedulingSimulator.__init__(self,
@@ -64,6 +66,8 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
         self.build_observation_space()
         self.episode_performance_matrix_score = 0.0
         self.num_step = 0
+        self.reward_func = reward
+        self.reward_k = k
 
     def build_observation_space(self):
         """
@@ -274,20 +278,33 @@ class GymSchedulerEnv(HPCSchedulingSimulator, gym.Env, ABC):
                                                                 self.current_timestamp,
                                                                 self.loads[self.start],
                                                                 self.loads.max_procs)
-        gamma = 50
+        reward = 0
 
-        rl_total = -sum(complete_job_matrix.values())
-        if not self.done and job.real_flag:
-            # rl_total /= len(self.scheduled_rl) - eps  # small reward experiment
-            # rl_total = rl_total - eps  # normal reward experiment
-            # rl_total = -eps  # episode
-            # if job.real_flag:
-            # rl_total = max(rl_total, rl_total / 4) # reward scaling
+        if self.reward_func == 0:  # episodic reward
 
-            reward = np.exp(rl_total/gamma) / (1 + np.exp(rl_total/gamma))
-        else:
-            self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
-            reward = 0 - eps
+            if not self.done:
+                reward = 0
+            else:
+                self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
+                reward = self.episode_performance_matrix_score
+
+        elif self.reward_func == 1:  # non-scaling reward
+            if not self.done:
+                reward = -sum(complete_job_matrix.values())
+            else:
+                self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
+                reward = 0
+
+        elif self.reward_func == 2:  # sigmoid scaling
+
+            k = self.reward_k
+            rl_total = -sum(complete_job_matrix.values())
+
+            if not self.done and job.real_flag:
+                reward = np.exp(rl_total / k) / (1 + np.exp(rl_total / k))
+            else:
+                self.episode_performance_matrix_score = -sum(complete_job_matrix.values())
+                reward = 0 - eps
 
         return reward
 

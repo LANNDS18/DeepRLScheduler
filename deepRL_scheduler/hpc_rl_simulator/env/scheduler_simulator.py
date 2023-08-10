@@ -420,6 +420,8 @@ class HPCSchedulingSimulator(ABC):
 
                 assert range_end - start >= job_sequence_size + 1
 
+                print(":ENV: start evaluation:", start)
+
                 self.start = start
 
         self.start_idx_last_reset = self.start

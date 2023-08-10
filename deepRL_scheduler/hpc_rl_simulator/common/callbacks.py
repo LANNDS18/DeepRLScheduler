@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import os
 
-import numpy as np
 from typing import Optional
 
+import numpy as np
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.vec_env import VecEnv, DummyVecEnv
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 def evaluate_policy(
@@ -98,6 +97,10 @@ class EvalCallback(BaseCallback):
             self.best_record = performance_score
             print(f"New record: {performance_score}, Saving new best model to {self.save_path}")
             self.model.save(self.save_path)
+            if performance_score == self.best_record:
+                self.early_stop_count += 1
+            else:
+                self.early_stop_count = 0
 
         print(f"Evaluation: mean reward = {mean_reward}, std reward = {reward_std}")
         self.logger.record("eval/evaluation_env_mean_reward", mean_reward)
