@@ -7,7 +7,21 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 def init_evaluation_env(workload_path, ENV, config, flatten_state_space=True):
     customEnv = ENV(
         flatten_observation=flatten_state_space,
-        trace_sample_range=[0.5, 1.0],
+        trace_sample_range=[0.6, 1.0],
+        workload_file=workload_path,
+        job_score_type=config['score_type'],
+        quiet=True,
+        seed=config['seed'],
+        use_fixed_job_sequence=True,
+        customized_trace_len_range=(0, 20000)
+    )
+    return customEnv
+
+
+def init_validation_env(workload_path, ENV, config, flatten_state_space=True):
+    customEnv = ENV(
+        flatten_observation=flatten_state_space,
+        trace_sample_range=[0.4, 0.6],
         workload_file=workload_path,
         job_score_type=config['score_type'],
         quiet=True,

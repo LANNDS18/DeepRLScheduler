@@ -365,7 +365,7 @@ class HPCSchedulingSimulator(ABC):
             done = self.process_job_queue()
             return done
 
-    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None, reset_num=50):
+    def reset_simulator(self, use_fixed_job_sequence=False, customized_trace_len_range=None, sample_grow=1.5):
         """
         Resets the simulation environment by resetting the cluster and the loads, and initializing various
         instance variables to their starting values. It then optionally fills some pre-workloads and returns the initial
@@ -408,19 +408,17 @@ class HPCSchedulingSimulator(ABC):
             if self.trace_sample_range is None:
                 self.start = min([job_sequence_size * self.n_reset_simulator, self.loads.size - job_sequence_size])
             else:
-                start, end = (self.loads.size * self.trace_sample_range).astype(int)
+                range_start, range_end = (self.loads.size * self.trace_sample_range).astype(int)
 
-                start_ratio = (end - job_sequence_size - 1 - start) / reset_num
-
-                move_start = int(min([start + start_ratio * self.n_reset_simulator, end - job_sequence_size - 1]))
-
+                move_start = int(self.n_reset_simulator * sample_grow * job_sequence_size) + range_start
                 move_end = move_start + job_sequence_size + 1
 
-                if move_end <= end and move_end - move_start >= job_sequence_size + 1:
+                if move_end <= range_end and move_end - move_start >= job_sequence_size + 1:
                     start = move_start
                 else:
-                    start = end - job_sequence_size - 1
-                assert end - start >= job_sequence_size + 1
+                    start = range_end - job_sequence_size - 1
+
+                assert range_end - start >= job_sequence_size + 1
 
                 self.start = start
 
