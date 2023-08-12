@@ -1,6 +1,6 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
-    "model_dir": "./trained_models/reward_function/episodic_reward",
+    "model_dir": "./data/trained_models/reward_function/episodic_reward",
     "log_dir": "./data/logs/reward_function/episodic_reward",
     "gamma": 1.00,
     "gae_lambda": 0.95,

@@ -1,6 +1,6 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
-    "model_dir": "./trained_models/reward_function/sigmoid_reward_k100",
+    "model_dir": "./data/trained_models/reward_function/sigmoid_reward_k100",
     "log_dir": "./data/logs/reward_function/sigmoid_reward_k100",
     "gamma": 0.99,
     "gae_lambda": 0.95,

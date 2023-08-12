@@ -32,10 +32,10 @@ def schedule_curr_sequence_reset(_env, model, log=True):
     return record
 
 
-with open('ppo-conf.json', 'r') as f:
-    config = json.load(f)
-
 if __name__ == '__main__':
+
+    with open('ppo_configs/1-reward_functions/episodic_reward.json', 'r') as f:
+        config = json.load(f)
 
     # init directories
     model_dir, log_data_dir, workload_file = init_dir_from_args(config)
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     scores = []
 
     for i in range(n_round):
-        model = PPO.load("trained_models/fine-tune-models/gamma_0.99/bsld/HPC2N-2002-2_ppo.zip", env=env)
+        model = PPO.load("data/trained_models/reward_function/episodic_reward/bsld/HPC2N-2002-2_ppo_bes_new.zip", env=env)
         scores. append(schedule_curr_sequence_reset(env, model, log=True))
 
     print(np.mean(scores))

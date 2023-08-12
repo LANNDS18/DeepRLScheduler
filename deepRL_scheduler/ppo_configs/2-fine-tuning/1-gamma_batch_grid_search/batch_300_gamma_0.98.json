@@ -1,6 +1,6 @@
 {
     "workload": "./dataset/HPC2N-2002-2.2-cln.swf",
-    "model_dir": "./trained_models/fine-tuning/batch_300_gamma_0.98",
+    "model_dir": "./data/trained_models/fine-tuning/batch_300_gamma_0.98",
     "log_dir": "./data/logs/fine-tuning/batch_300_gamma_0.98",
     "gamma": 0.98,
     "gae_lambda": 0.95,
