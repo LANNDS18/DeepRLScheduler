@@ -24,15 +24,17 @@ pip install -r requirements.txt
 
 ## Project Architecture
 
-1.  ./Documentation: This directory contains project meeting minutes and legacy source code.
+- `./Documentation`: This directory contains project meeting minutes and legacy source code.
 
-2. ./data: This folder contains training logs and trained models.
+- `./data`: This folder contains training logs and trained models.
 
-3. ./dataset: Contains all the workload datasets from the Parallel Workload Archive used in this project.
+- `./dataset`: Contains all the workload datasets from the Parallel Workload Archive used in this project.
 
-4. ./ppo_configs: This folder contains numerous configurations used in our experiments.
+- `./ppo_configs`: This folder contains numerous configurations used in our experiments.
 
-5. ./hpc_rl_simulator: This package contains the implementation of our HPC job scheduling simulator and its OpenAI gym wrappers. Additionally, it includes the customized actor policy networks, callbacks, and additional evaluation methods for training the Stable Baselines3 PPO agent.
+- `./hpc_rl_simulator`: This package contains the implementation of our HPC job scheduling simulator and its OpenAI gym wrappers. Additionally, it includes the customized actor policy networks, callbacks, and additional evaluation methods for training the Stable Baselines3 PPO agent.
+
+- `./result_analysis`: This folder contains the data visualization and result analysis of our experiments.
 
 
 ## Running
